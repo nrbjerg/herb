@@ -1,6 +1,7 @@
 # Herb
 ![Tests](https://github.com/nrbjerg/herb/actions/workflows/tests.yml/badge.svg)
-An open source python go engine. The game of go, is a very simple yet complex game, even on a 9 x 9 grid there are a total of <img src="https://latex.codecogs.com/gif.latex?1.03919148791 \\cdot 10^38 "/> [leagal positions](https://en.wikipedia.org/wiki/Go_and_mathematics).
+An open source python go engine. The game of go, is a very simple yet complex game, even on a 9 x 9 grid there are a total of approximately
+<img src="https://render.githubusercontent.com/render/math?math={\color{white}1.039 \\cdot 10^38}"> [leagal positions](https://en.wikipedia.org/wiki/Go_and_mathematics).
 
 ## Roadmap
 Basics 
