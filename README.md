@@ -4,11 +4,13 @@ An open source python go engine. The game of go, is a very simple yet complex ga
 
 ## Roadmap
 Basics 
- - [ ] Implement [scoring](https://senseis.xmp.net/?Scoring).
-   - [ ] Area scoring 
-   - [ ] Territory scoring
+ - [x] Implement [scoring](https://senseis.xmp.net/?Scoring).
+   - [x] Chinese scoring 
+   - [ ] Japanese scoring
  - [ ] Load games from [Smart Game Format](https://en.wikipedia.org/wiki/Smart_Game_Format).
- - [ ] Implement basic rules of go / move generation.
+ - [ ] Moves 
+    - [x] Move generation.
+    - [ ] Playing moves.
  - [ ] Testing of basics.
 
 AI 

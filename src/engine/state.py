@@ -7,7 +7,7 @@ from enum import IntEnum
 from itertools import product
 
 
-Point = Tuple[int]
+Point = Tuple[int, int]
 
 
 class GameOutcome(IntEnum):
@@ -29,6 +29,11 @@ class State:
         """Return a mask of the board, with 1 on the intersections with stones and 0 on the free intersections."""
         return np.sum(self.board, axis=0)
 
+    @staticmethod
+    def invert_bitmap(bitmap: ArrayLike) -> ArrayLike:
+        """Return an inverted bitmap, ie. 1 gets swaped to 0, and 0 to 1."""
+        return (bitmap + 1) % 2
+
     def __init__(self, dim: int):
         """Initialize a new state, with no handicaps."""
         self.dim = dim
@@ -46,6 +51,8 @@ class State:
             raise ValueError(f"Can't make move on {point}, a stone is already there")
 
         # TODO: HANDLE SURCIDE MOVES
+        elif self._check_for_surcide(point, (self.player + 1) % 2):
+            raise ValueError(f"Move: {point} is a surcide move!")
 
     def play_move(self, point: Point = None):
         """Play a move on the board, note that a point of none is used to inidicate a pass."""
@@ -67,15 +74,48 @@ class State:
 
         return True
 
+    # NOTE: Here oponent referes to the opponent of the string.
+    def count_liberties(self, string: List[Point], opponent_index: int) -> int:
+        """Count the number of liberites of a string of stones."""
+        n = 0
+        # Loop over each point in the string & count it's "liberties".
+        for point in string:
+            for adjecent in self._get_adjecent_points(point):
+                # If the adjecent point is in string, dont count it.
+                if (adjecent in string) is False and self.board[opponent_index][
+                    adjecent
+                ] == 0:
+                    n += 1
+
+        return n
+
+    # TODO: Keep track of the strings during computations (this sould make it alot more effective.)
+    def _captures(self, point: Point, opponent_index: int) -> bool:
+        """Return true if playing uppon that point causes a capture."""
+        for adjecent in self._get_adjecent_points(point):
+            # Count the number of liberties of the adjecent points, if it's 1 then its 0 after the move.
+            if self.board[opponent_index][adjecent] == 1:
+                string = self._flod_fill(
+                    self.invert_bitmap(self.board[opponent_index]), adjecent
+                )
+                if self.count_liberties(string, (opponent_index + 1) % 2) == 1:
+                    return True
+
+        return False
+
     def get_avalible_moves(self, player_index: int) -> ArrayLike:
         """Return a numpy array of avalible moves."""
         opponent = (player_index + 1) % 2
-        moves = (self.board_mask + 1) % 2  # NOTE: This just flips 0 to 1 and 1 to 0
+        moves = self.invert_bitmap(self.board_mask)
 
         for point in self.points:
-            # Check that it's not a surcide move
             if moves[point] == 1 and self._check_for_surcide(point, opponent):
-                moves[point] = 0
+                # Check if playing uppon that point, captures stones NOTE: This make the ko rule be true.
+                if self._captures(point, opponent):
+                    continue
+
+                else:
+                    moves[point] = 0
 
         return moves
 
@@ -163,8 +203,3 @@ class State:
                 points += len(string)
 
         return points
-
-
-def from_SGF(sgf: str) -> State:
-    """Produce a State, by playing the moves in the sgf format."""
-    pass
