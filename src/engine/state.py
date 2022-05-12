@@ -117,15 +117,13 @@ class State:
         elif point in self._get_adjecent_points(
             self.last_move
         ):  # Check if the last move is captured as the only stone.
-            string = (
-                self._flod_fill(
-                    self.invert_bitmap(self.board[opponent]), self.last_move
-                ),
+            string = self._flod_fill(
+                self.invert_bitmap(self.board[opponent]), self.last_move
             )
 
+            print(string)
             if (
-                self.count_liberties(string, (opponent + 1) % 2)
-                == 1  # FIXME: The error is here
+                self.count_liberties(string, (opponent + 1) % 2) == 1
                 and len(string) == 1
             ):
                 return True  # This is the only point where capturing is not allowed.

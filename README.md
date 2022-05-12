@@ -10,6 +10,7 @@ Basics
  - [ ] Load games from [Smart Game Format](https://en.wikipedia.org/wiki/Smart_Game_Format).
  - [ ] Moves 
     - [x] Move generation.
+    - [x] Ko
     - [ ] Playing moves.
  - [ ] Testing of basics.
 
