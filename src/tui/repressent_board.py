@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 from engine.state import State
+import numpy as np
 
 
-def get_string_representation(state: State) -> str:
+def get_string_representation(state: State, square_types: str = "") -> str:
     """ Returns a string representation of the board """
     string = ""
 
@@ -23,3 +24,37 @@ def get_string_representation(state: State) -> str:
         string += f"{chr(idx + 97)} "
 
     return string
+
+
+def main() -> None:
+    white = [
+        [0, 0, 0, 0, 1, 1, 0, 0, 0],
+        [0, 1, 0, 1, 1, 0, 0, 0, 0],
+        [0, 1, 0, 1, 0, 0, 0, 0, 0],
+        [1, 1, 1, 1, 1, 0, 0, 0, 0],
+        [0, 0, 1, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 1, 1, 0, 0, 0, 0],
+        [0, 0, 1, 0, 1, 1, 0, 0, 0],
+        [0, 0, 1, 1, 0, 1, 1, 0, 0],
+        [0, 0, 1, 0, 0, 0, 1, 0, 0],
+    ]
+
+    black = [
+        [0, 0, 0, 0, 0, 0, 1, 0, 0],
+        [0, 0, 0, 0, 0, 1, 1, 0, 0],
+        [0, 0, 0, 0, 1, 1, 1, 0, 0],
+        [0, 0, 0, 0, 0, 1, 0, 0, 0],
+        [1, 1, 0, 1, 1, 1, 0, 0, 0],
+        [0, 1, 1, 0, 0, 1, 1, 1, 1],
+        [1, 1, 0, 0, 0, 0, 1, 0, 0],
+        [0, 1, 0, 0, 0, 0, 0, 1, 0],
+        [0, 1, 0, 0, 0, 0, 0, 1, 0],
+    ]
+
+    state = State(9)
+    state.board = np.array([black, white])
+    print(get_string_representation(state))
+
+
+if __name__ == "__main__":
+    main()

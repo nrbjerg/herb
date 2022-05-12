@@ -40,6 +40,7 @@ class State:
         self.board = np.zeros((2, dim, dim), dtype=np.int64)
         self.player = 0
         self.number_of_passes = 0
+        self.last_move = None
 
     def _check_move(self, point: Point) -> None:
         """Check wether a move is valid, note that this might throw an expection"""
@@ -64,6 +65,8 @@ class State:
         else:
             self.number_of_passes += 1
 
+        # Update variables
+        self.last_move = point
         self.player = (self.player + 1) % 2
 
     def _check_for_surcide(self, point: Point, opponent_index: int) -> bool:
@@ -103,6 +106,33 @@ class State:
 
         return False
 
+    # NOTE: statement: One may not capture just one stone if that stone was played on the previous move and that move also captured just one stone.
+    def _ko(self, point: Point, opponent: int) -> bool:
+        """Check that the point is not a ko point."""
+
+        print(self.last_move)
+        if self.last_move is None:
+            return False
+
+        elif point in self._get_adjecent_points(
+            self.last_move
+        ):  # Check if the last move is captured as the only stone.
+            string = (
+                self._flod_fill(
+                    self.invert_bitmap(self.board[opponent]), self.last_move
+                ),
+            )
+
+            if (
+                self.count_liberties(string, (opponent + 1) % 2)
+                == 1  # FIXME: The error is here
+                and len(string) == 1
+            ):
+                return True  # This is the only point where capturing is not allowed.
+
+        return False
+
+    # TODO: implement KO, see REF: https://www.britgo.org/intro/intro2.html
     def get_avalible_moves(self, player_index: int) -> ArrayLike:
         """Return a numpy array of avalible moves."""
         opponent = (player_index + 1) % 2
@@ -110,8 +140,8 @@ class State:
 
         for point in self.points:
             if moves[point] == 1 and self._check_for_surcide(point, opponent):
-                # Check if playing uppon that point, captures stones NOTE: This make the ko rule be true.
-                if self._captures(point, opponent):
+                # Check if playing uppon that point, captures stones, and isn't a ko
+                if self._captures(point, opponent) and not self._ko(point, opponent):
                     continue
 
                 else:

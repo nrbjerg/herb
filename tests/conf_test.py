@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 from engine.state import State
+from tui.repressent_board import get_string_representation
 import numpy as np
 
 
@@ -32,4 +33,8 @@ def load_test_state() -> State:
     ]
 
     state.board = np.array([black, white])
+
+    print("Current state")
+    print(get_string_representation(state))
+
     return state
