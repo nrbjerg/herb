@@ -1,0 +1,21 @@
+# Model hyperparameters
+model_hyperparameters:
+  # Residual block parameters
+  number_of_residual_blocks: 4
+  number_of_filters: 3
+
+  # Hidden layer hyper parameters
+  number_of_hidden_layers: 2
+  number_of_neurons: 128
+
+  # head hyper parameters
+  value_head_filters: 8
+  policy_head_filters: 24
+
+  # General hyper parameters
+  perform_batch_norm: False
+  dropout_rate: 0.01
+
+game_parameters:
+  size: 9
+  maximum_number_of_moves: 180
