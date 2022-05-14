@@ -1,44 +1,12 @@
 #!/usr/bin/env python3
-import pytest
 from engine.state import State
-from .conf_test import load_test_state
+from .conf_test import (
+    load_test_state,
+    load_ko_and_surcide_state,
+    load_string_capture_state,
+)
 from tui.repressent_board import get_string_representation
 import numpy as np
-
-
-def load_ko_and_surcide_state():
-    # Test for KO & surcide
-    white = [
-        [0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0, 1, 0, 0],
-        [0, 0, 0, 0, 0, 0, 0, 1, 0],
-        [1, 0, 0, 0, 0, 0, 1, 0, 0],
-        [0, 1, 0, 0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0, 0, 0, 1],
-        [0, 0, 0, 0, 0, 0, 0, 0, 0],
-    ]
-
-    black = [
-        [0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 1, 0, 0, 0],
-        [0, 0, 0, 0, 1, 0, 1, 0, 0],
-        [0, 0, 0, 0, 0, 1, 0, 0, 0],
-        [1, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 1, 0, 0, 0, 0, 0, 0, 0],
-        [1, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0, 0, 1, 0],
-        [0, 0, 0, 0, 0, 0, 1, 0, 1],
-    ]
-
-    state = State(9)
-    state.board = np.array([black, white])
-
-    print("Current state")
-    print(get_string_representation(state))
-
-    return state
 
 
 def test_move_surcide_moves():
@@ -71,7 +39,6 @@ def test_move_surcide_moves():
             [1, 0, 0, 1, 1, 1, 0, 0, 1],
         ]
     )
-
     print("Check that avalible moves works")
     assert np.array_equal(state.get_avalible_moves(0), black_avalible_moves)
     assert np.array_equal(state.get_avalible_moves(1), white_avalible_moves)
@@ -83,9 +50,9 @@ def test_move_surcide_moves():
     print("Testing surcide moves")
     for point in state.points:
         if point in [(8, 7), (5, 0), (2, 5)]:
-            assert state._check_for_surcide(point, 0) == True
+            assert state._check_for_surcide(point, 0)
         else:
-            assert state._check_for_surcide(point, 0) == False
+            assert not state._check_for_surcide(point, 0)
 
     # print(get_string_representation(state))
     print("Testing liberties")
@@ -103,3 +70,32 @@ def test_ko():
     state.last_move = (2, 6)
 
     assert state.get_avalible_moves(1)[2][5] == 0
+
+
+def test_captures():
+    """Test that the capturing mechanicsms work"""
+    # test cases for single stones
+    state = load_ko_and_surcide_state()
+    state.current_player = 1
+    state.play_move((2, 5))
+    assert state.board[0][2][5] == 0
+
+    state.current_player = 1
+    state.play_move((8, 7))
+    assert state.board[0][8][8] == 0
+
+    state.current_player = 1
+    state.play_move((5, 0))
+    assert state.board[0][4][0] == 0
+
+    # test cases for strings
+    state = load_string_capture_state()
+    state.current_player = 1
+    state.play_move((3, 1))
+    assert state.board[0][3][2] == 0
+    assert state.board[0][3][3] == 0
+
+    state.play_move((7, 8))
+    assert state.board[1][7][8] == 0
+    assert state.board[1][8][8] == 0
+    assert state.board[1][8][7] == 0

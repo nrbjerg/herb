@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
-import pytest
-from engine.state import State, GameOutcome
+from engine.state import State
 from .conf_test import load_test_state
-import numpy as np
 
 
 def test_scoring():

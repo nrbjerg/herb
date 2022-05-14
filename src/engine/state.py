@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import numpy as np
-import numba as nb
-from typing import List, Tuple, Set, Iterator
+from typing import List, Tuple, Iterator
 from numpy.typing import ArrayLike
 from enum import IntEnum
 from itertools import product
@@ -29,6 +28,11 @@ class State:
         """Return a mask of the board, with 1 on the intersections with stones and 0 on the free intersections."""
         return np.sum(self.board, axis=0)
 
+    @property
+    def current_opponent(self) -> int:
+        """Get the index of the opponent of the current player."""
+        return (self.current_player + 1) % 2
+
     @staticmethod
     def invert_bitmap(bitmap: ArrayLike) -> ArrayLike:
         """Return an inverted bitmap, ie. 1 gets swaped to 0, and 0 to 1."""
@@ -38,11 +42,12 @@ class State:
         """Initialize a new state, with no handicaps."""
         self.dim = dim
         self.board = np.zeros((2, dim, dim), dtype=np.int64)
-        self.player = 0
+        self.current_player = 0
         self.number_of_passes = 0
         self.last_move = None
 
-    def _check_move(self, point: Point) -> None:
+    # NOTE: This is only used when the human player has to make a move
+    def check_move(self, point: Point) -> None:
         """Check wether a move is valid, note that this might throw an expection"""
         if point[0] < 0 or point[0] >= self.dim or point[1] < 0 or point[1] >= self.dim:
             raise ValueError(
@@ -51,23 +56,42 @@ class State:
         elif self.board_mask[point] != 0:
             raise ValueError(f"Can't make move on {point}, a stone is already there")
 
-        # TODO: HANDLE SURCIDE MOVES
-        elif self._check_for_surcide(point, (self.player + 1) % 2):
+        elif self._check_for_surcide(
+            point, (self.current_player + 1) % 2
+        ) and not self._captures(point, self.current_opponent):
             raise ValueError(f"Move: {point} is a surcide move!")
+
+        elif self._ko(point, self.current_opponent) == True:
+            raise ValueError(f"Move: {point} dosn't respect the ko rule.")
+
+    def remove_string(self, string: List[Point], string_player_index: int):
+        """Remove the string from the mask and return the mask."""
+        for point in string:
+            self.board[string_player_index][point] = 0
+
+    def capture_stones_after_move(self, point: Point):
+        """Remove dead stones from the board after playing at a point."""
+        for adjecent in self._get_adjecent_points(point):
+            # Check if the strings have 0 liberties and remove them if so
+            if self.board[self.current_opponent][adjecent] == 1:
+                string = self._flod_fill(
+                    self.invert_bitmap(self.board[self.current_opponent]), adjecent
+                )
+                if self.count_liberties(string, self.current_player) == 0:
+                    self.remove_string(string, self.current_opponent)
 
     def play_move(self, point: Point = None):
         """Play a move on the board, note that a point of none is used to inidicate a pass."""
-        if point != None:
-            self._check_move(point)
-            self.board[self.player][point] = 1
-            # Check if the move kills stones TODO:
+        if point is not None:
+            self.board[self.current_player][point] = 1
+            self.capture_stones_after_move(point)
 
         else:
             self.number_of_passes += 1
 
         # Update variables
         self.last_move = point
-        self.player = (self.player + 1) % 2
+        self.current_player = self.current_opponent
 
     def _check_for_surcide(self, point: Point, opponent_index: int) -> bool:
         """Return True if there is an adjecent point where the mask is 0."""
@@ -109,8 +133,6 @@ class State:
     # NOTE: statement: One may not capture just one stone if that stone was played on the previous move and that move also captured just one stone.
     def _ko(self, point: Point, opponent: int) -> bool:
         """Check that the point is not a ko point."""
-
-        print(self.last_move)
         if self.last_move is None:
             return False
 
@@ -130,7 +152,6 @@ class State:
 
         return False
 
-    # TODO: implement KO, see REF: https://www.britgo.org/intro/intro2.html
     def get_avalible_moves(self, player_index: int) -> ArrayLike:
         """Return a numpy array of avalible moves."""
         opponent = (player_index + 1) % 2
@@ -152,7 +173,7 @@ class State:
     ) -> List[Point]:
         """Perform breath first search on the mask and returns
            a list of all the points connected to the starting point."""
-        if points == None:
+        if points is None:
             points = []
 
         # Only perform recursion if there is nothing at the starting point
@@ -224,7 +245,7 @@ class State:
             border = set()
             for point in string:
                 for adjecent in self._get_adjecent_points(point):
-                    if (adjecent in string) == False:
+                    if not (adjecent in string):
                         border.add(adjecent)
 
             if border.issubset(stones):
