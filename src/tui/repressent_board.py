@@ -3,25 +3,30 @@ from engine.state import State
 import numpy as np
 
 
-def get_string_representation(state: State, square_types: str = "") -> str:
+def get_string_representation(
+    state: State, square_types: str = "", debug: bool = True
+) -> str:
     """ Returns a string representation of the board """
-    string = ""
+    string = "   "
+    for idx in range(state.dim):
+        if debug:
+            string += f"{idx} "
+        else:
+            string += f"{chr(idx + 97)} "
 
     for idx in range(state.dim):
+        string += "\n"
         # Add the row number
-        string += (
-            f"{state.dim - idx} " if (state.dim - idx) >= 10 else f" {state.dim - idx} "
-        )
+        if debug:
+            string += f" {idx} " if (idx <= 9) else f"{idx} "
+        else:
+            string += f" {chr(idx + 97)}"
         # Print add row
         for jdx in range(state.dim):
             cell = state.board[0][idx][jdx] - state.board[1][idx][jdx]
             string += square_types[cell] + " "
-        string += "\n"
 
     # Add column number
-    string += "   "
-    for idx in range(state.dim):
-        string += f"{chr(idx + 97)} "
 
     return string
 
