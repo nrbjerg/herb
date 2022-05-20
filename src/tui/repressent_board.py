@@ -20,9 +20,10 @@ def get_string_representation(
         if debug:
             string += f" {idx} " if (idx <= 9) else f"{idx} "
         else:
-            string += f" {chr(idx + 97)}"
+            string += f" {chr(idx + 97)} "
         # Print add row
         for jdx in range(state.dim):
+            print((idx, jdx), state.board[0][idx][jdx], state.board[1][idx][jdx])
             cell = state.board[0][idx][jdx] - state.board[1][idx][jdx]
             string += square_types[cell] + " "
 

@@ -4,17 +4,7 @@ from typing import List, Tuple, Iterator
 from numpy.typing import ArrayLike
 from enum import IntEnum
 from itertools import product
-
-
-Point = Tuple[int, int]
-
-
-class GameOutcome(IntEnum):
-    """ Used to model the outcome of the game (suprice!) """
-
-    loss = -1
-    draw = 0
-    win = 1
+from engine.misc.types import Point, Board, Matrix
 
 
 class State:
@@ -24,8 +14,11 @@ class State:
         return product(range(self.dim), range(self.dim))
 
     @property
-    def board_mask(self) -> ArrayLike:
-        """Return a mask of the board, with 1 on the intersections with stones and 0 on the free intersections."""
+    def board_mask(self) -> Board:
+        """
+            Return a mask of the board, with 1 on the intersections with
+            stones and 0 on the free intersections.
+        """
         return np.sum(self.board, axis=0)
 
     @property
@@ -34,14 +27,15 @@ class State:
         return (self.current_player + 1) % 2
 
     @staticmethod
-    def invert_bitmap(bitmap: ArrayLike) -> ArrayLike:
+    def invert_bitmap(bitmap: Matrix) -> Matrix:
         """Return an inverted bitmap, ie. 1 gets swaped to 0, and 0 to 1."""
         return (bitmap + 1) % 2
 
-    def __init__(self, dim: int):
+    def __init__(self, dim: int, komi: float = 0):
         """Initialize a new state, with no handicaps."""
         self.dim = dim
         self.board = np.zeros((2, dim, dim), dtype=np.int64)
+        self.komi = komi
         self.current_player = 0
         self.number_of_passes = 0
         self.last_move = None
@@ -152,7 +146,7 @@ class State:
 
         return False
 
-    def get_avalible_moves(self, player_index: int) -> ArrayLike:
+    def get_avalible_moves(self, player_index: int) -> Matrix:
         """Return a numpy array of avalible moves."""
         opponent = (player_index + 1) % 2
         moves = self.invert_bitmap(self.board_mask)
@@ -169,7 +163,7 @@ class State:
         return moves
 
     def _flod_fill(
-        self, mask: ArrayLike, starting_point: Point, points: List[Point] = None
+        self, mask: Matrix, starting_point: Point, points: List[Point] = None
     ) -> List[Point]:
         """Perform breath first search on the mask and returns
            a list of all the points connected to the starting point."""
@@ -239,13 +233,13 @@ class State:
             if self.board[player_index][point[0]][point[1]] == 1
         }
 
-        points = len(stones)
+        points = len(stones) + (self.komi if player_index == 1 else 0)
         for string in empty_points_strings:
             # NOTE: Only add adjecent points if they aren't in the string
             border = set()
             for point in string:
                 for adjecent in self._get_adjecent_points(point):
-                    if not (adjecent in string):
+                    if adjecent not in string:
                         border.add(adjecent)
 
             if border.issubset(stones):

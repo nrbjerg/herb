@@ -8,7 +8,7 @@ def load_config():
     """Load the entiere config from the current working directory."""
     path = os.path.join(os.getcwd(), "conf.yaml")
     with open(path, "r") as file:
-        conf = yaml.load(file, loader=yaml.FullLoader)
+        conf = yaml.load(file, Loader=yaml.FullLoader)
 
     return conf
 

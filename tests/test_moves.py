@@ -78,7 +78,8 @@ def test_captures():
     state = load_ko_and_surcide_state()
     state.current_player = 1
     state.play_move((2, 5))
-    assert state.board[0][2][5] == 0
+    assert state.board[0][2][6] == 0
+    assert state.board[1][2][5] == 1
 
     state.current_player = 1
     state.play_move((8, 7))
