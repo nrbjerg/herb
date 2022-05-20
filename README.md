@@ -8,15 +8,15 @@ Basics
    - [x] Chinese scoring 
    - [ ] Japanese scoring
  - [ ] Load games from [Smart Game Format](https://en.wikipedia.org/wiki/Smart_Game_Format).
- - [ ] Moves 
+ - [x] Moves 
     - [x] Move generation.
     - [x] Ko
-    - [ ] Playing moves.
- - [ ] Testing of basics.
+    - [x] Playing moves.
+ - [x] Testing of basics.
 
 AI 
  - [ ] Monte Carlo Tree Search.
- - [ ] Convolutional neural network.
+ - [x] Res net.
  - [ ] Training visualizations 
 
 Distributed Training

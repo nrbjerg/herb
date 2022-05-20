@@ -24,11 +24,14 @@ class ResidualBlock(nn.Module):
         self.conv1 = nn.Conv2d(
             model_config["number_of_filters"],
             model_config["number_of_filters"],
-            2,
+            3,
             padding=1,
         )
         self.conv2 = nn.Conv2d(
-            model_config["number_of_filters"], model_config["number_of_filters"], 2
+            model_config["number_of_filters"],
+            model_config["number_of_filters"],
+            3,
+            padding=1,
         )
 
         self.dropout1 = nn.Dropout(p=model_config["dropout_rate"])
@@ -74,7 +77,7 @@ class ValueHead(nn.Module):
         # Hidden layers
         hidden_layers = [
             nn.Linear(
-                model_config["value_head_filters"] * (size + 1) * (size + 1),
+                model_config["value_head_filters"] * size * size,
                 model_config["number_of_neurons"],
             )
         ]
@@ -87,7 +90,7 @@ class ValueHead(nn.Module):
 
         hidden_layers.append(nn.Linear(model_config["number_of_neurons"], 1))
 
-        self.hiddenLayers = nn.ModuleList(hidden_layers)
+        self.hidden_layers = nn.ModuleList(hidden_layers)
 
     def forward(self, x: Tensor, training: bool = False) -> Tensor:
         """Pass data through the value head of the network."""
@@ -103,7 +106,7 @@ class ValueHead(nn.Module):
             if training:
                 x = dropout(x)
 
-        return torch.tanh(self.hiddenLayers[-1](x))
+        return torch.tanh(self.hidden_layers[-1](x))
 
 
 class PolicyHead(nn.Module):
@@ -114,9 +117,9 @@ class PolicyHead(nn.Module):
         super(PolicyHead, self).__init__()
         # Convolutional filters
         self.conv = nn.Conv2d(
-            model_config["number_of_filters"], model_config["policy_head_fitlers"], 1
+            model_config["number_of_filters"], model_config["policy_head_filters"], 1
         )
-        self.batch_norm = nn.BatchNorm2d(model_config["policy_head_fitlers"])
+        self.batch_norm = nn.BatchNorm2d(model_config["policy_head_filters"])
 
         # Dropout layers
         self.dropout_layers = nn.ModuleList(
@@ -129,7 +132,7 @@ class PolicyHead(nn.Module):
         # Hidden layers
         hidden_layers = [
             nn.Linear(
-                model_config["policy_head_fitlers"] * (size + 1) * (size + 1),
+                model_config["policy_head_filters"] * size * size,
                 model_config["number_of_neurons"],
             )
         ]
@@ -140,9 +143,9 @@ class PolicyHead(nn.Module):
                 )
             )
 
-        hidden_layers.append(nn.Linear(model_config["number_of_neurons"], 7))
+        hidden_layers.append(nn.Linear(model_config["number_of_neurons"], size * size))
 
-        self.hiddenLayers = nn.ModuleList(hidden_layers)
+        self.hidden_layers = nn.ModuleList(hidden_layers)
 
     def forward(self, x: Tensor, training: bool = False) -> Tensor:
         """Pass data through the policy head of the network."""
@@ -172,12 +175,7 @@ class Model(nn.Module):
         """Initialize the model."""
         super(Model, self).__init__()
         # Shared layers
-        self.conv = nn.Conv2d(
-            2 * model_config["number_of_maps_per_player"],
-            model_config["number_of_filters"],
-            2,
-            padding=1,
-        )
+        self.conv = nn.Conv2d(2, model_config["number_of_filters"], 3, padding=1,)
         self.batch_norm = nn.BatchNorm2d(model_config["number_of_filters"])
         self.dropout = nn.Dropout(model_config["dropout_rate"])
 
