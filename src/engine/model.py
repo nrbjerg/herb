@@ -143,7 +143,10 @@ class PolicyHead(nn.Module):
                 )
             )
 
-        hidden_layers.append(nn.Linear(model_config["number_of_neurons"], size * size))
+        # NOTE: We also have an output for passing.
+        hidden_layers.append(
+            nn.Linear(model_config["number_of_neurons"], size * size + 1)
+        )
 
         self.hidden_layers = nn.ModuleList(hidden_layers)
 

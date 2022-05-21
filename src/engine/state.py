@@ -111,7 +111,6 @@ class State:
 
         # Update variables
         self.moves.append(point)
-        print(self.moves)
         self.current_player = self.current_opponent
 
     def _check_for_surcide(self, point: Point, opponent_index: int) -> bool:
@@ -266,7 +265,6 @@ class State:
         for idx, move in enumerate(
             reversed(self.moves[-config["game"]["moves_given_to_model"] :])
         ):
-            print(move)
             mask[idx][move] = 1
 
         return mask
