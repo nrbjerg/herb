@@ -105,9 +105,9 @@ def test_captures():
     print("testing move tensor")
     mask = np.zeros(
         (
-            config["game_parameters"]["moves_given_to_model"],
-            config["game_parameters"]["size"],
-            config["game_parameters"]["size"],
+            config["game"]["moves_given_to_model"],
+            config["game"]["size"],
+            config["game"]["size"],
         )
     )
     mask[0, 7, 8] = 1

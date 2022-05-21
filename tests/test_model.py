@@ -10,7 +10,7 @@ def test_dimensions():
     size = 9
     model = Model()
     tensor = torch.rand(
-        (batch_size, 5 + config["game_parameters"]["moves_given_to_model"], size, size)
+        (batch_size, 5 + config["game"]["moves_given_to_model"], size, size)
     )
     pol, val = model(tensor)
     assert pol.shape == (batch_size, size * size)

@@ -261,12 +261,10 @@ class State:
 
     def get_move_tensor(self) -> Matrix:
         """Create a 3d tensor, to mask the latest moves."""
-        mask = np.zeros(
-            (config["game_parameters"]["moves_given_to_model"], self.size, self.size)
-        )
+        mask = np.zeros((config["game"]["moves_given_to_model"], self.size, self.size))
 
         for idx, move in enumerate(
-            reversed(self.moves[-config["game_parameters"]["moves_given_to_model"] :])
+            reversed(self.moves[-config["game"]["moves_given_to_model"] :])
         ):
             print(move)
             mask[idx][move] = 1

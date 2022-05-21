@@ -7,8 +7,8 @@ from torch import Tensor
 # Load configuration
 from engine.misc.config import config
 
-model_config = config["model_hyperparameters"]
-size = config["game_parameters"]["size"]
+model_config = config["model"]
+size = config["game"]["size"]
 
 # NOTE: Run on cuda if avalible
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -178,7 +178,7 @@ class Model(nn.Module):
         # so a totoal of 5 + move_given_to_model
         # Shared layers
         self.conv = nn.Conv2d(
-            5 + config["game_parameters"]["moves_given_to_model"],
+            5 + config["game"]["moves_given_to_model"],
             model_config["number_of_filters"],
             3,
             padding=1,

@@ -14,6 +14,7 @@ from engine.misc.types import (
 from numpy.typing import ArrayLike
 from engine.state import State
 from engine.misc.config import config
+import os
 
 
 def extract_symertries(
@@ -44,7 +45,7 @@ def get_datapoints(
 ) -> List[Datapoint]:
     """Play the moves and extract datapoints, along with their symertries."""
     datapoints = []
-    state = State(config["game_parameters"]["size"], config["game_parameters"]["komi"])
+    state = State(config["game"]["size"], config["game"]["komi"])
     for policy, move in zip(policies, moves):
         # Is this how good the current state is for the player or other whise
         # (i think its how good it is for the opponent)
@@ -57,12 +58,10 @@ def get_datapoints(
         legal_moves = np.expand_dims(
             state.get_avalible_moves(state.current_player), axis=0
         )
-        move_history = state.create_move_tensor()
+        move_history = state.get_move_tensor()
         board = state.board
         board_mask = np.expand_dims(state.board_mask, axis=0)
-        liberties = np.zeros(
-            (1, config["game_parameters"]["size"], config["game_parameters"]["size"])
-        )
+        liberties = np.zeros((1, config["game"]["size"], config["game"]["size"]))
         inputs = np.concatenate(
             [board, board_mask, liberties, legal_moves, move_history], axis=0
         )
@@ -72,6 +71,11 @@ def get_datapoints(
         state.play_move(move)
 
     return datapoints
+
+
+def create_dataest(number_of_datapoints: int) -> Dataset:
+    """Load the dataset, containing the latest datapoints, from the data directory."""
+    pass
 
 
 def create_dataset_from_datapoints(datapoints: List[Datapoint]) -> Dataset:
