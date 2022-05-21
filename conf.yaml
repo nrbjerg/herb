@@ -18,4 +18,8 @@ model_hyperparameters:
 
 game_parameters:
   size: 9
+  komi: 4.5
   maximum_number_of_moves: 180
+  moves_given_to_model: 5
+
+# Model inputs (legal moves, player stones, opponent stones, moves_given_to_model x previus moves, liberties)

@@ -174,8 +174,15 @@ class Model(nn.Module):
     def __init__(self):
         """Initialize the model."""
         super(Model, self).__init__()
+        # NOTE: input axis = 0 has dimension: board (2) + board_mask (1) + liberties (1) + legal_moves (1) + move_history (unknown, but given in config)
+        # so a totoal of 5 + move_given_to_model
         # Shared layers
-        self.conv = nn.Conv2d(2, model_config["number_of_filters"], 3, padding=1,)
+        self.conv = nn.Conv2d(
+            5 + config["game_parameters"]["moves_given_to_model"],
+            model_config["number_of_filters"],
+            3,
+            padding=1,
+        )
         self.batch_norm = nn.BatchNorm2d(model_config["number_of_filters"])
         self.dropout = nn.Dropout(model_config["dropout_rate"])
 
