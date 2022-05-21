@@ -28,6 +28,13 @@ game:
 # Data parameters
 data:
   path_to_database: "data/"
+  window: 100
+  games_per_generation: 81
+
 # Training parameters
+training:
+  epochs: 100
+  lr: 0.002  # TODO: Experiment with sliding windows
+  batch_size: 128
 
 # Model inputs (legal moves, player stones, opponent stones, moves_given_to_model x previus moves, liberties)
