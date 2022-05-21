@@ -4,7 +4,8 @@ from torch import nn
 import torch.nn.functional as F
 from torch import Tensor
 
-# Load configuration
+import os
+
 from engine.misc.config import config
 
 model_config = config["model"]
@@ -12,6 +13,8 @@ size = config["game"]["size"]
 
 # NOTE: Run on cuda if avalible
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+path_to_cache = os.path.join(os.getcwd(), config["model"]["path_to_cache"])
 
 
 class ResidualBlock(nn.Module):
@@ -217,3 +220,17 @@ class Model(nn.Module):
     def numberOfParameters(self) -> int:
         """Get the number of parameters of the model."""
         return sum(p.numel() for p in self.parameters())
+
+
+def save_model(model: Model):
+    """Save the model, to the file system"""
+    number_of_saved_models = len(os.listdir(path_to_cache))
+    file_path = os.path.join(path_to_cache, f"{number_of_saved_models}.pt")
+    torch.save(model, file_path)
+
+
+def load_latest_model() -> Model:
+    """Load the latest, model from the file system"""
+    number_of_saved_models = len(os.listdir(path_to_cache))
+    file_path = os.path.join(os.getcwd(), f"{number_of_saved_models - 1}.pt")
+    return torch.load(os.path.join)
