@@ -1,6 +1,0 @@
-{
-    "moves": [[1, 1]],
-    "policies": [[[1]], [[2]]],
-    "winner": "white",
-    "point_difference": 4.5
-}
