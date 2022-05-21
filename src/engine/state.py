@@ -259,7 +259,7 @@ class State:
 
         return points
 
-    def create_move_tensor(self) -> Matrix:
+    def get_move_tensor(self) -> Matrix:
         """Create a 3d tensor, to mask the latest moves."""
         mask = np.zeros(
             (config["game_parameters"]["moves_given_to_model"], self.size, self.size)
@@ -270,5 +270,34 @@ class State:
         ):
             print(move)
             mask[idx][move] = 1
+
+        return mask
+
+    # TODO: there must be a faster way to do this, maybe keep track of the strings seperatly?
+    def get_liberties_matrix(self) -> Matrix:
+        """
+           Create a tensor with entery i,j corresponding the number of liberties that
+           the string containing the stone at i,j has, 0 if i,j is an empty point.
+        """
+        mask = np.zeros((self.size, self.size))
+        points = set()
+        for point in self.points:
+            # Skip already visited points
+            if point in points:
+                continue
+
+            # Figure out the index of the player
+            player = None
+            for i in range(2):
+                if self.board[i][point] == 1:
+                    player = i
+                    break
+
+            if player is not None:
+                string = self._flod_fill(self.invert_bitmap(self.board[player]), point)
+                liberties = self.count_liberties(string, (player + 1) % 2)
+
+                for connected in string:
+                    mask[connected] = liberties
 
         return mask

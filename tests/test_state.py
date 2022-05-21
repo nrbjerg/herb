@@ -112,4 +112,26 @@ def test_captures():
     )
     mask[0, 7, 8] = 1
     mask[1, 3, 1] = 1
-    assert np.array_equal(mask, state.create_move_tensor())
+    assert np.array_equal(mask, state.get_move_tensor())
+
+
+def test_liberites_mask():
+    """Tests the liberties mask."""
+    state = load_ko_and_surcide_state()
+    liberties = state.get_liberties_matrix()
+
+    expected = np.array(
+        [
+            [0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 3, 2, 0, 0],
+            [0, 0, 0, 0, 4, 0, 1, 3, 0],
+            [2, 0, 0, 0, 0, 3, 2, 0, 0],
+            [1, 2, 0, 0, 0, 0, 0, 0, 0],
+            [0, 3, 0, 0, 0, 0, 0, 0, 0],
+            [3, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 3, 1],
+            [0, 0, 0, 0, 0, 0, 3, 0, 1],
+        ]
+    )
+
+    assert np.array_equal(liberties, expected)
