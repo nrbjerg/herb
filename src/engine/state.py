@@ -5,13 +5,34 @@ from numpy.typing import ArrayLike
 from enum import IntEnum
 from itertools import product
 from engine.misc.types import Point, Board, Matrix
+from engine.misc.config import config
+import numba as nb
 
 
+@nb.njit()
+def _get_adjecent_points(point: Point, size: int) -> Iterator[Point]:
+    """Iterate over adjecent points."""
+    if point[0] > 0:
+        yield (point[0] - 1, point[1])
+
+    if point[1] > 0:
+        yield (point[0], point[1] - 1)
+
+    if point[0] < size - 1:
+        yield (point[0] + 1, point[1])
+
+    if point[1] < size - 1:
+        yield (point[0], point[1] + 1)
+
+
+# TODO: Maybe create a liberties mask & update that, in stead of computing liberties on the fly?
 class State:
+    """Store information about a game state"""
+
     @property
     def points(self) -> List[Point]:
         """Return a list of all of the points, on the board."""
-        return product(range(self.dim), range(self.dim))
+        return product(range(self.size), range(self.size))
 
     @property
     def board_mask(self) -> Board:
@@ -31,21 +52,26 @@ class State:
         """Return an inverted bitmap, ie. 1 gets swaped to 0, and 0 to 1."""
         return (bitmap + 1) % 2
 
-    def __init__(self, dim: int, komi: float = 0):
+    def __init__(self, size: int, komi: float = 0):
         """Initialize a new state, with no handicaps."""
-        self.dim = dim
-        self.board = np.zeros((2, dim, dim), dtype=np.int64)
+        self.size = size
+        self.board = np.zeros((2, size, size), dtype=np.int64)
         self.komi = komi
         self.current_player = 0
         self.number_of_passes = 0
-        self.last_move = None
+        self.moves = []
 
     # NOTE: This is only used when the human player has to make a move
     def check_move(self, point: Point) -> None:
-        """Check wether a move is valid, note that this might throw an expection"""
-        if point[0] < 0 or point[0] >= self.dim or point[1] < 0 or point[1] >= self.dim:
+        """Check wether a move is valid, note that this might throw an expection."""
+        if (
+            point[0] < 0
+            or point[0] >= self.size
+            or point[1] < 0
+            or point[1] >= self.size
+        ):
             raise ValueError(
-                f"invalid move: the point {point} is not in the range {self.dim} x {self.dim}"
+                f"invalid move: the point {point} is not in the range {self.size} x {self.size}"
             )
         elif self.board_mask[point] != 0:
             raise ValueError(f"Can't make move on {point}, a stone is already there")
@@ -55,7 +81,7 @@ class State:
         ) and not self._captures(point, self.current_opponent):
             raise ValueError(f"Move: {point} is a surcide move!")
 
-        elif self._ko(point, self.current_opponent) == True:
+        elif self._ko(point, self.current_opponent):
             raise ValueError(f"Move: {point} dosn't respect the ko rule.")
 
     def remove_string(self, string: List[Point], string_player_index: int):
@@ -65,7 +91,7 @@ class State:
 
     def capture_stones_after_move(self, point: Point):
         """Remove dead stones from the board after playing at a point."""
-        for adjecent in self._get_adjecent_points(point):
+        for adjecent in _get_adjecent_points(point, self.size):
             # Check if the strings have 0 liberties and remove them if so
             if self.board[self.current_opponent][adjecent] == 1:
                 string = self._flod_fill(
@@ -84,12 +110,13 @@ class State:
             self.number_of_passes += 1
 
         # Update variables
-        self.last_move = point
+        self.moves.append(point)
+        print(self.moves)
         self.current_player = self.current_opponent
 
     def _check_for_surcide(self, point: Point, opponent_index: int) -> bool:
         """Return True if there is an adjecent point where the mask is 0."""
-        for adjecent in self._get_adjecent_points(point):
+        for adjecent in _get_adjecent_points(point, self.size):
             if self.board[opponent_index][adjecent[0]][adjecent[1]] == 0:
                 return False
 
@@ -101,7 +128,7 @@ class State:
         n = 0
         # Loop over each point in the string & count it's "liberties".
         for point in string:
-            for adjecent in self._get_adjecent_points(point):
+            for adjecent in _get_adjecent_points(point, self.size):
                 # If the adjecent point is in string, dont count it.
                 if (adjecent in string) is False and self.board[opponent_index][
                     adjecent
@@ -113,7 +140,7 @@ class State:
     # TODO: Keep track of the strings during computations (this sould make it alot more effective.)
     def _captures(self, point: Point, opponent_index: int) -> bool:
         """Return true if playing uppon that point causes a capture."""
-        for adjecent in self._get_adjecent_points(point):
+        for adjecent in _get_adjecent_points(point, self.size):
             # Count the number of liberties of the adjecent points, if it's 1 then its 0 after the move.
             if self.board[opponent_index][adjecent] == 1:
                 string = self._flod_fill(
@@ -126,18 +153,17 @@ class State:
 
     # NOTE: statement: One may not capture just one stone if that stone was played on the previous move and that move also captured just one stone.
     def _ko(self, point: Point, opponent: int) -> bool:
-        """Check that the point is not a ko point."""
-        if self.last_move is None:
+        """Check that the point is a ko point."""
+        if len(self.moves) == 0 or self.moves[-1] is None:
             return False
 
-        elif point in self._get_adjecent_points(
-            self.last_move
+        elif point in _get_adjecent_points(
+            self.moves[-1], self.size
         ):  # Check if the last move is captured as the only stone.
             string = self._flod_fill(
-                self.invert_bitmap(self.board[opponent]), self.last_move
+                self.invert_bitmap(self.board[opponent]), self.moves[-1]
             )
 
-            print(string)
             if (
                 self.count_liberties(string, (opponent + 1) % 2) == 1
                 and len(string) == 1
@@ -176,7 +202,7 @@ class State:
         else:
             return points
 
-        for point in self._get_adjecent_points(starting_point):
+        for point in _get_adjecent_points(starting_point, self.size):
             if point in points:  # Avoid infinite loops
                 continue
             else:
@@ -187,25 +213,11 @@ class State:
     def _is_adjecent_to(self, point: Point, player_index: int) -> bool:
         """Check if the point is adjecent to a stone of the given player."""
         # Loop over each edjecent point, and checks if there is a stone there.
-        for adjecent in self._get_adjecent_points(point):
+        for adjecent in _get_adjecent_points(point, self.size):
             if self.board[player_index][adjecent[0]][adjecent[1]] == 1:
                 return True
 
         return False
-
-    def _get_adjecent_points(self, point: Point) -> Iterator[Point]:
-        """Iterate over adjecent points."""
-        if point[0] > 0:
-            yield (point[0] - 1, point[1])
-
-        if point[1] > 0:
-            yield (point[0], point[1] - 1)
-
-        if point[0] < self.dim - 1:
-            yield (point[0] + 1, point[1])
-
-        if point[1] < self.dim - 1:
-            yield (point[0], point[1] + 1)
 
     # REF: https://senseis.xmp.net/?Scoring
     # TODO: implement half move scoring
@@ -238,7 +250,7 @@ class State:
             # NOTE: Only add adjecent points if they aren't in the string
             border = set()
             for point in string:
-                for adjecent in self._get_adjecent_points(point):
+                for adjecent in _get_adjecent_points(point, self.size):
                     if adjecent not in string:
                         border.add(adjecent)
 
@@ -246,3 +258,17 @@ class State:
                 points += len(string)
 
         return points
+
+    def create_move_tensor(self) -> Matrix:
+        """Create a 3d tensor, to mask the latest moves."""
+        mask = np.zeros(
+            (config["game_parameters"]["moves_given_to_model"], self.size, self.size)
+        )
+
+        for idx, move in enumerate(
+            reversed(self.moves[-config["game_parameters"]["moves_given_to_model"] :])
+        ):
+            print(move)
+            mask[idx][move] = 1
+
+        return mask

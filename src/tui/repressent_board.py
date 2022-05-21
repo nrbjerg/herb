@@ -8,13 +8,13 @@ def get_string_representation(
 ) -> str:
     """ Returns a string representation of the board """
     string = "   "
-    for idx in range(state.dim):
+    for idx in range(state.size):
         if debug:
             string += f"{idx} "
         else:
             string += f"{chr(idx + 97)} "
 
-    for idx in range(state.dim):
+    for idx in range(state.size):
         string += "\n"
         # Add the row number
         if debug:
@@ -22,8 +22,8 @@ def get_string_representation(
         else:
             string += f" {chr(idx + 97)} "
         # Print add row
-        for jdx in range(state.dim):
-            print((idx, jdx), state.board[0][idx][jdx], state.board[1][idx][jdx])
+        for jdx in range(state.size):
+            # print((idx, jdx), state.board[0][idx][jdx], state.board[1][idx][jdx])
             cell = state.board[0][idx][jdx] - state.board[1][idx][jdx]
             string += square_types[cell] + " "
 
