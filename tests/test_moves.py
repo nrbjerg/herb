@@ -6,6 +6,7 @@ from .conf_test import (
     load_string_capture_state,
 )
 from tui.repressent_board import get_string_representation
+from engine.misc.config import config
 import numpy as np
 
 
@@ -67,7 +68,7 @@ def test_move_surcide_moves():
 def test_ko():
     """Test that the ko functionallity works."""
     state = load_ko_and_surcide_state()
-    state.last_move = (2, 6)
+    state.moves.append((2, 6))
 
     assert state.get_avalible_moves(1)[2][5] == 0
 
@@ -100,3 +101,15 @@ def test_captures():
     assert state.board[1][7][8] == 0
     assert state.board[1][8][8] == 0
     assert state.board[1][8][7] == 0
+
+    print("testing move tensor")
+    mask = np.zeros(
+        (
+            config["game_parameters"]["moves_given_to_model"],
+            config["game_parameters"]["size"],
+            config["game_parameters"]["size"],
+        )
+    )
+    mask[0, 7, 8] = 1
+    mask[1, 3, 1] = 1
+    assert np.array_equal(mask, state.create_move_tensor())

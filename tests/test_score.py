@@ -5,9 +5,9 @@ from .conf_test import load_test_state
 
 def test_scoring():
     """Test the scoring method"""
-    dim = 9
+    size = 9
     # Check that the empty board has score 0
-    state = State(dim)
+    state = State(size)
     assert state.score_relative_to(0) == 0
 
     # Check the test state
