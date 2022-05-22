@@ -135,3 +135,24 @@ def test_liberites_mask():
     )
 
     assert np.array_equal(liberties, expected)
+
+
+def test_hash():
+    """Tests that the hashing algorithm is functional."""
+    state1 = State(9, 9)
+    state2 = State(9, 9)
+
+    assert state1.__hash__() == state2.__hash__()
+
+    state1.play_move((5, 5))
+    state2.play_move((5, 5))
+    assert state1.__hash__() == state2.__hash__()
+
+    state1.play_move((4, 4))
+    state1.play_move((2, 2))
+    state1.play_move((3, 3))
+
+    state2.play_move((3, 3))
+    state2.play_move((2, 2))
+    state2.play_move((4, 4))
+    assert state1.__hash__() != state2.__hash__()

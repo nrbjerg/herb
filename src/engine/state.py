@@ -4,7 +4,7 @@ from typing import List, Tuple, Iterator
 from numpy.typing import ArrayLike
 from enum import IntEnum
 from itertools import product
-from engine.misc.types import Point, Board, Matrix
+from engine.misc.types import Point, Board, Matrix, Player
 from engine.misc.config import config
 import numba as nb
 
@@ -45,7 +45,7 @@ class State:
     @property
     def current_opponent(self) -> int:
         """Get the index of the opponent of the current player."""
-        return (self.current_player + 1) % 2
+        return Player.Oppoent(self.current_player)
 
     @staticmethod
     def invert_bitmap(bitmap: Matrix) -> Matrix:
@@ -57,7 +57,7 @@ class State:
         self.size = size
         self.board = np.zeros((2, size, size), dtype=np.int64)
         self.komi = komi
-        self.current_player = 0
+        self.current_player = Player.BLACK
         self.number_of_passes = 0
         self.moves = []
 
@@ -77,28 +77,28 @@ class State:
             raise ValueError(f"Can't make move on {point}, a stone is already there")
 
         elif self._check_for_surcide(
-            point, (self.current_player + 1) % 2
+            point, self.current_opponent
         ) and not self._captures(point, self.current_opponent):
             raise ValueError(f"Move: {point} is a surcide move!")
 
         elif self._ko(point, self.current_opponent):
             raise ValueError(f"Move: {point} dosn't respect the ko rule.")
 
-    def remove_string(self, string: List[Point], string_player_index: int):
-        """Remove the string from the mask and return the mask."""
-        for point in string:
-            self.board[string_player_index][point] = 0
+    def remove_group(self, group: List[Point], group_player_index: int):
+        """Remove the group from the mask and return the mask."""
+        for point in group:
+            self.board[group_player_index][point] = 0
 
     def capture_stones_after_move(self, point: Point):
         """Remove dead stones from the board after playing at a point."""
         for adjecent in _get_adjecent_points(point, self.size):
-            # Check if the strings have 0 liberties and remove them if so
+            # Check if the groups have 0 liberties and remove them if so
             if self.board[self.current_opponent][adjecent] == 1:
-                string = self._flod_fill(
+                group = self._flod_fill(
                     self.invert_bitmap(self.board[self.current_opponent]), adjecent
                 )
-                if self.count_liberties(string, self.current_player) == 0:
-                    self.remove_string(string, self.current_opponent)
+                if self.count_liberties(group, self.current_player) == 0:
+                    self.remove_group(group, self.current_opponent)
 
     def play_move(self, point: Point = None):
         """Play a move on the board, note that a point of none is used to inidicate a pass."""
@@ -121,31 +121,31 @@ class State:
 
         return True
 
-    # NOTE: Here oponent referes to the opponent of the string.
-    def count_liberties(self, string: List[Point], opponent_index: int) -> int:
-        """Count the number of liberites of a string of stones."""
+    # NOTE: Here oponent referes to the opponent of the group.
+    def count_liberties(self, group: List[Point], opponent_index: int) -> int:
+        """Count the number of liberites of a group of stones."""
         n = 0
-        # Loop over each point in the string & count it's "liberties".
-        for point in string:
+        # Loop over each point in the group & count it's "liberties".
+        for point in group:
             for adjecent in _get_adjecent_points(point, self.size):
-                # If the adjecent point is in string, dont count it.
-                if (adjecent in string) is False and self.board[opponent_index][
+                # If the adjecent point is in group, dont count it.
+                if (adjecent in group) is False and self.board[opponent_index][
                     adjecent
                 ] == 0:
                     n += 1
 
         return n
 
-    # TODO: Keep track of the strings during computations (this sould make it alot more effective.)
+    # TODO: Keep track of the groups during computations (this sould make it alot more effective.)
     def _captures(self, point: Point, opponent_index: int) -> bool:
         """Return true if playing uppon that point causes a capture."""
         for adjecent in _get_adjecent_points(point, self.size):
             # Count the number of liberties of the adjecent points, if it's 1 then its 0 after the move.
             if self.board[opponent_index][adjecent] == 1:
-                string = self._flod_fill(
+                group = self._flod_fill(
                     self.invert_bitmap(self.board[opponent_index]), adjecent
                 )
-                if self.count_liberties(string, (opponent_index + 1) % 2) == 1:
+                if self.count_liberties(group, Player.Oppoent(opponent_index)) == 1:
                     return True
 
         return False
@@ -159,13 +159,13 @@ class State:
         elif point in _get_adjecent_points(
             self.moves[-1], self.size
         ):  # Check if the last move is captured as the only stone.
-            string = self._flod_fill(
+            group = self._flod_fill(
                 self.invert_bitmap(self.board[opponent]), self.moves[-1]
             )
 
             if (
-                self.count_liberties(string, (opponent + 1) % 2) == 1
-                and len(string) == 1
+                self.count_liberties(group, Player.Oppoent(opponent)) == 1
+                and len(group) == 1
             ):
                 return True  # This is the only point where capturing is not allowed.
 
@@ -173,7 +173,7 @@ class State:
 
     def get_avalible_moves(self, player_index: int) -> Matrix:
         """Return a numpy array of avalible moves."""
-        opponent = (player_index + 1) % 2
+        opponent = Player.Oppoent(player_index)
         moves = self.invert_bitmap(self.board_mask)
 
         for point in self.points:
@@ -222,21 +222,21 @@ class State:
     # TODO: implement half move scoring
     def score_relative_to(self, player_index: int) -> int:
         """Compute the final score of the game."""
-        empty_points_strings = []
+        empty_points_groups = []
         for point in self.points:
             # Skip the point, if it has already been visited or there is a stone
-            if point in sum(empty_points_strings, []) or self.board_mask[point] == 1:
+            if point in sum(empty_points_groups, []) or self.board_mask[point] == 1:
                 continue
 
-            empty_points_strings.append(self._flod_fill(self.board_mask, point))
+            empty_points_groups.append(self._flod_fill(self.board_mask, point))
 
         # Compute the scores of each player
-        player_score = self.score(player_index, empty_points_strings)
-        oponent_score = self.score((player_index + 1) % 2, empty_points_strings)
+        player_score = self.score(player_index, empty_points_groups)
+        oponent_score = self.score(Player.Oppoent(player_index), empty_points_groups)
 
         return player_score - oponent_score
 
-    def score(self, player_index: int, empty_points_strings: List[List[Point]]) -> int:
+    def score(self, player_index: int, empty_points_groups: List[List[Point]]) -> int:
         """Compute the score of the given player, using the chinese scoring method."""
         stones = {
             point
@@ -245,16 +245,16 @@ class State:
         }
 
         points = len(stones) + (self.komi if player_index == 1 else 0)
-        for string in empty_points_strings:
-            # NOTE: Only add adjecent points if they aren't in the string
+        for group in empty_points_groups:
+            # NOTE: Only add adjecent points if they aren't in the group
             border = set()
-            for point in string:
+            for point in group:
                 for adjecent in _get_adjecent_points(point, self.size):
-                    if adjecent not in string:
+                    if adjecent not in group:
                         border.add(adjecent)
 
             if border.issubset(stones):
-                points += len(string)
+                points += len(group)
 
         return points
 
@@ -269,11 +269,11 @@ class State:
 
         return mask
 
-    # TODO: there must be a faster way to do this, maybe keep track of the strings seperatly?
+    # TODO: there must be a faster way to do this, maybe keep track of the groups seperatly?
     def get_liberties_matrix(self) -> Matrix:
         """
            Create a tensor with entery i,j corresponding the number of liberties that
-           the string containing the stone at i,j has, 0 if i,j is an empty point.
+           the group containing the stone at i,j has, 0 if i,j is an empty point.
         """
         mask = np.zeros((self.size, self.size))
         points = set()
@@ -290,10 +290,19 @@ class State:
                     break
 
             if player is not None:
-                string = self._flod_fill(self.invert_bitmap(self.board[player]), point)
-                liberties = self.count_liberties(string, (player + 1) % 2)
+                group = self._flod_fill(self.invert_bitmap(self.board[player]), point)
+                liberties = self.count_liberties(group, Player.Oppoent(player))
 
-                for connected in string:
+                for connected in group:
                     mask[connected] = liberties
 
         return mask
+
+    def __hash__(self):
+        """Make the state hashable, this is based uppon the latest move (respecting ko) and the current position."""
+        # NOTE: Take the current board state, the current player and
+        # the latest move into acount, this makes sure that the hashing repects ko
+        if len(self.moves) > 0:
+            return hash((self.board.tobytes(), self.current_player, self.moves[-1]))
+        else:
+            return hash((self.board.tobytes(), self.current_player))

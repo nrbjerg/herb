@@ -16,7 +16,7 @@ class Player(IntEnum):
     BLACK = 0
     WHITE = 1
 
-    @staticmethod()
+    @staticmethod
     def Oppoent(player: int):
         """Get the opponent of the player."""
         return Player.BLACK if player == Player.WHITE else Player.WHITE
