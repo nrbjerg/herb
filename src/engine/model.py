@@ -14,7 +14,7 @@ size = config["game"]["size"]
 # NOTE: Run on cuda if avalible
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-path_to_cache = os.path.join(os.getcwd(), config["model"]["path_to_cache"])
+path_to_cache = os.path.join(os.getcwd(), config["model"]["path_to_model_cache"])
 
 
 class ResidualBlock(nn.Module):

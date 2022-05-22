@@ -13,5 +13,5 @@ def test_dimensions():
         (batch_size, 5 + config["game"]["moves_given_to_model"], size, size)
     )
     pol, val = model(tensor)
-    assert pol.shape == (batch_size, size * size)
+    assert pol.shape == (batch_size, size * size + 1)
     assert val.shape == (batch_size, 1)
