@@ -33,7 +33,11 @@ def train(dataset: Dataset, model: Model) -> Model:
     )
     number_of_datapoints = inputs.size()[0]
 
-    optimizer = Adam(model.parameters(), lr=config["training"]["lr"])
+    optimizer = Adam(
+        model.parameters(),
+        lr=config["training"]["lr"],
+        weight_decay=config["training"]["weight_decay"],
+    )
     with trange(config["training"]["epochs"], unit="epoch") as t:
         for epoch in t:
 
@@ -62,3 +66,8 @@ def train(dataset: Dataset, model: Model) -> Model:
             )
 
     return model
+
+
+def self_play(model: Model):
+    """Use self play to get a new dataset, which will be saved, in the data directory"""
+    pass

@@ -223,14 +223,14 @@ class Model(nn.Module):
 
 
 def save_model(model: Model):
-    """Save the model, to the file system"""
+    """Save the model, to the file system."""
     number_of_saved_models = len(os.listdir(path_to_cache))
     file_path = os.path.join(path_to_cache, f"{number_of_saved_models}.pt")
     torch.save(model, file_path)
 
 
 def load_latest_model() -> Model:
-    """Load the latest, model from the file system"""
+    """Load the latest, model from the file system."""
     number_of_saved_models = len(os.listdir(path_to_cache))
     file_path = os.path.join(os.getcwd(), f"{number_of_saved_models - 1}.pt")
-    return torch.load(os.path.join)
+    return torch.load(file_path)
