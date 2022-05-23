@@ -4,7 +4,7 @@ from typing import List, Tuple, Iterator
 from numpy.typing import ArrayLike
 from enum import IntEnum
 from itertools import product
-from engine.misc.types import Point, Board, Matrix, Player
+from engine.misc.types import Point, Board, Matrix, Player, Move
 from engine.misc.config import config
 import numba as nb
 
@@ -25,9 +25,31 @@ def _get_adjecent_points(point: Point, size: int) -> Iterator[Point]:
         yield (point[0], point[1] + 1)
 
 
+def _flod_fill(
+    mask: Matrix, starting_point: Point, size: int, points: List[Point] = None
+) -> List[Point]:
+    """Perform breath first search on the mask and returns a list of all the points connected to the starting point."""
+    if points is None:
+        points = []
+
+    # Only perform recursion if there is nothing at the starting point
+    if mask[starting_point] == 0:
+        points.append(starting_point)
+    else:
+        return points
+
+    for point in _get_adjecent_points(starting_point, size):
+        if point in points:  # Avoid infinite loops
+            continue
+        else:
+            points = _flod_fill(mask, point, size, points=points)
+
+    return points
+
+
 # TODO: Maybe create a liberties mask & update that, in stead of computing liberties on the fly?
 class State:
-    """Store information about a game state"""
+    """Store information about a game state."""
 
     @property
     def points(self) -> List[Point]:
@@ -62,55 +84,56 @@ class State:
         self.moves = []
 
     # NOTE: This is only used when the human player has to make a move
-    def check_move(self, point: Point) -> None:
+    def check_move(self, move: Move):
         """Check wether a move is valid, note that this might throw an expection."""
-        if (
-            point[0] < 0
-            or point[0] >= self.size
-            or point[1] < 0
-            or point[1] >= self.size
-        ):
+        # It is always legal to pass
+        if move == None:
+            return
+
+        if move[0] < 0 or move[0] >= self.size or move[1] < 0 or move[1] >= self.size:
             raise ValueError(
-                f"invalid move: the point {point} is not in the range {self.size} x {self.size}"
+                f"invalid move: the point {move} is not in the range {self.size} x {self.size}"
             )
-        elif self.board_mask[point] != 0:
-            raise ValueError(f"Can't make move on {point}, a stone is already there")
+        if self.board_mask[move] != 0:
+            raise ValueError(f"Can't make move on {move}, a stone is already there")
 
-        elif self._check_for_surcide(
-            point, self.current_opponent
-        ) and not self._captures(point, self.current_opponent):
-            raise ValueError(f"Move: {point} is a surcide move!")
+        if self._check_for_surcide(move, self.current_opponent) and not self._captures(
+            move, self.current_opponent
+        ):
+            raise ValueError(f"Move: {move} is a surcide move!")
 
-        elif self._ko(point, self.current_opponent):
-            raise ValueError(f"Move: {point} dosn't respect the ko rule.")
+        if self._ko(move, self.current_opponent):
+            raise ValueError(f"Move: {move} dosn't respect the ko rule.")
 
     def remove_group(self, group: List[Point], group_player_index: int):
         """Remove the group from the mask and return the mask."""
         for point in group:
             self.board[group_player_index][point] = 0
 
-    def capture_stones_after_move(self, point: Point):
+    def capture_stones_after_move(self, move: Move):
         """Remove dead stones from the board after playing at a point."""
-        for adjecent in _get_adjecent_points(point, self.size):
+        for adjecent in _get_adjecent_points(move, self.size):
             # Check if the groups have 0 liberties and remove them if so
             if self.board[self.current_opponent][adjecent] == 1:
-                group = self._flod_fill(
-                    self.invert_bitmap(self.board[self.current_opponent]), adjecent
+                group = _flod_fill(
+                    self.invert_bitmap(self.board[self.current_opponent]),
+                    adjecent,
+                    self.size,
                 )
                 if self.count_liberties(group, self.current_player) == 0:
                     self.remove_group(group, self.current_opponent)
 
-    def play_move(self, point: Point = None):
+    def play_move(self, move: Move = None):
         """Play a move on the board, note that a point of none is used to inidicate a pass."""
-        if point is not None:
-            self.board[self.current_player][point] = 1
-            self.capture_stones_after_move(point)
+        if move is not None:
+            self.board[self.current_player][move] = 1
+            self.capture_stones_after_move(move)
 
         else:
             self.number_of_passes += 1
 
         # Update variables
-        self.moves.append(point)
+        self.moves.append(move)
         self.current_player = self.current_opponent
 
     def _check_for_surcide(self, point: Point, opponent_index: int) -> bool:
@@ -142,8 +165,8 @@ class State:
         for adjecent in _get_adjecent_points(point, self.size):
             # Count the number of liberties of the adjecent points, if it's 1 then its 0 after the move.
             if self.board[opponent_index][adjecent] == 1:
-                group = self._flod_fill(
-                    self.invert_bitmap(self.board[opponent_index]), adjecent
+                group = _flod_fill(
+                    self.invert_bitmap(self.board[opponent_index]), adjecent, self.size
                 )
                 if self.count_liberties(group, Player.Oppoent(opponent_index)) == 1:
                     return True
@@ -159,8 +182,8 @@ class State:
         elif point in _get_adjecent_points(
             self.moves[-1], self.size
         ):  # Check if the last move is captured as the only stone.
-            group = self._flod_fill(
-                self.invert_bitmap(self.board[opponent]), self.moves[-1]
+            group = _flod_fill(
+                self.invert_bitmap(self.board[opponent]), self.moves[-1], self.size
             )
 
             if (
@@ -187,28 +210,6 @@ class State:
 
         return moves
 
-    def _flod_fill(
-        self, mask: Matrix, starting_point: Point, points: List[Point] = None
-    ) -> List[Point]:
-        """Perform breath first search on the mask and returns
-           a list of all the points connected to the starting point."""
-        if points is None:
-            points = []
-
-        # Only perform recursion if there is nothing at the starting point
-        if mask[starting_point] == 0:
-            points.append(starting_point)
-        else:
-            return points
-
-        for point in _get_adjecent_points(starting_point, self.size):
-            if point in points:  # Avoid infinite loops
-                continue
-            else:
-                points = self._flod_fill(mask, point, points=points)
-
-        return points
-
     def _is_adjecent_to(self, point: Point, player_index: int) -> bool:
         """Check if the point is adjecent to a stone of the given player."""
         # Loop over each edjecent point, and checks if there is a stone there.
@@ -228,7 +229,7 @@ class State:
             if point in sum(empty_points_groups, []) or self.board_mask[point] == 1:
                 continue
 
-            empty_points_groups.append(self._flod_fill(self.board_mask, point))
+            empty_points_groups.append(_flod_fill(self.board_mask, point, self.size))
 
         # Compute the scores of each player
         player_score = self.score(player_index, empty_points_groups)
@@ -290,13 +291,31 @@ class State:
                     break
 
             if player is not None:
-                group = self._flod_fill(self.invert_bitmap(self.board[player]), point)
+                group = _flod_fill(
+                    self.invert_bitmap(self.board[player]), point, self.size
+                )
                 liberties = self.count_liberties(group, Player.Oppoent(player))
 
                 for connected in group:
                     mask[connected] = liberties
 
         return mask
+
+    def convert_to_input_tensor(self) -> ArrayLike:
+        """Convert the state into a tensor, that is feedable to the model."""
+        legal_moves = np.expand_dims(
+            self.get_avalible_moves(self.current_player), axis=0
+        )
+        move_history = self.get_move_tensor()
+        board = self.board
+        board_mask = np.expand_dims(self.board_mask, axis=0)
+        # TODO:
+        liberties = np.zeros((1, self.size, self.size))
+        inputs = np.concatenate(
+            [board, board_mask, liberties, legal_moves, move_history], axis=0
+        )
+
+        return inputs
 
     def __hash__(self):
         """Make the state hashable, this is based uppon the latest move (respecting ko) and the current position."""

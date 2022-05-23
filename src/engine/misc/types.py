@@ -1,11 +1,14 @@
 """The types used by the engine."""
 # /usr/bin/env python3
-from typing import Tuple, List, Dict, Any
+from typing import Tuple, List, Dict, Any, Union
 from numpy.typing import ArrayLike
 from enum import IntEnum
 from dataclasses import dataclass
 
 Point = Tuple[int, int]
+Pass = None
+Move = Union[Point, Pass]
+Hash = int
 Matrix = ArrayLike
 Board = ArrayLike
 
