@@ -4,6 +4,7 @@ from typing import Tuple, List, Dict, Any, Union
 from numpy.typing import ArrayLike
 from enum import IntEnum
 from dataclasses import dataclass
+from engine.misc.config import config
 
 Point = Tuple[int, int]
 Pass = None
@@ -67,10 +68,16 @@ class Game:
 
     def to_dict(self) -> Dict[str, Any]:
         """Return a dictionary version of the game, ready to be saved."""
-        return {
-            "pre_moves": self.pre_moves,
-            "moves": self.moves,
-            "winner": self.outcome.winner,
+        dictionary = {
+            "pre_moves": [tuple(int(c) for c in move) for move in self.pre_moves],
+            "moves": [
+                (config["game"]["size"], config["game"]["size"])
+                if move is Pass
+                else tuple(int(c) for c in move)
+                for move in self.moves
+            ],
+            "winner": "white" if self.outcome.winner == Player.WHITE else "black",
             "point_difference": self.outcome.point_difference,
-            "policies": self.policies,
+            "policies": [policy.tolist() for policy in self.policies],
         }
+        return dictionary
