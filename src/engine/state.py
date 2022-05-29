@@ -1,9 +1,10 @@
-#!/usr/bin/env python3
+"""Source for modeling a go state, getting model inputs ect."""
+# /usr/bin/env python3
 import numpy as np
-from typing import List, Tuple, Iterator
+from typing import List, Iterator
 from numpy.typing import ArrayLike
-from enum import IntEnum
 from itertools import product
+import random
 from engine.misc.types import Point, Board, Matrix, Player, Move
 from engine.misc.config import config
 import numba as nb
@@ -232,12 +233,12 @@ class State:
             empty_points_groups.append(_flod_fill(self.board_mask, point, self.size))
 
         # Compute the scores of each player
-        player_score = self.score(player_index, empty_points_groups)
-        oponent_score = self.score(Player.Oppoent(player_index), empty_points_groups)
+        player_score = self._score(player_index, empty_points_groups)
+        oponent_score = self._score(Player.Oppoent(player_index), empty_points_groups)
 
         return player_score - oponent_score
 
-    def score(self, player_index: int, empty_points_groups: List[List[Point]]) -> int:
+    def _score(self, player_index: int, empty_points_groups: List[List[Point]]) -> int:
         """Compute the score of the given player, using the chinese scoring method."""
         stones = {
             point
@@ -309,13 +310,25 @@ class State:
         move_history = self.get_move_tensor()
         board = self.board
         board_mask = np.expand_dims(self.board_mask, axis=0)
-        # TODO:
-        liberties = np.zeros((1, self.size, self.size))
+        liberties = np.expand_dims(self.get_liberties_matrix(), axis=0)
         inputs = np.concatenate(
             [board, board_mask, liberties, legal_moves, move_history], axis=0
         )
 
         return inputs
+
+    def has_terminated(self) -> bool:
+        """Check if the game has terminated."""
+        # The game board is full
+        if np.sum(np.sum(self.board_mask, axis=1), axis=0) == self.size * self.size:
+            return True
+
+        # Last to moves where passes
+        elif len(self.moves) > 2 and self.moves[-1] is None and self.moves[-2] is None:
+            return True
+
+        else:
+            return False
 
     def __hash__(self):
         """Make the state hashable, this is based uppon the latest move (respecting ko) and the current position."""
@@ -325,3 +338,10 @@ class State:
             return hash((self.board.tobytes(), self.current_player, self.moves[-1]))
         else:
             return hash((self.board.tobytes(), self.current_player))
+
+
+def get_initial_moves(size: int, number_of_initial_moves: int) -> List[Move]:
+    """Get a random list of initial moves."""
+    valid_moves = product(range(size), range(size))
+    moves = random.choices(list(valid_moves), k=number_of_initial_moves)
+    return moves
