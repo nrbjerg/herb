@@ -33,9 +33,20 @@ data:
 
 # Training parameters
 training:
-  epochs: 100
+  epochs: 1000
   lr: 0.002  # TODO: Experiment with sliding windows
   batch_size: 128
+  roolouts: 30
   weight_decay: 0.00005
+  moves_before_deterministic_play: 20
+  maximum_number_of_moves: 140
+  number_of_games: 1
+
+testing:
+  roolouts: 20
+  moves_before_deterministic_play: 0
+  pre_game_moves: 2
+  number_of_games: 10
+  maximum_number_of_moves: 140
 
 # Model inputs (legal moves, player stones, opponent stones, moves_given_to_model x previus moves, liberties)
