@@ -205,7 +205,7 @@ class Model(nn.Module):
         # Pass the data through the residual part of the network
         x = F.relu(self.batch_norm(self.conv(x)))
         if training:
-            x = self.dropout_layer(x)
+            x = self.dropout(x)
 
         for res_block in self.residual_blocks:
             x = res_block(x, training=training)
@@ -232,5 +232,12 @@ def save_model(model: Model):
 def load_latest_model() -> Model:
     """Load the latest, model from the file system."""
     number_of_saved_models = len(os.listdir(path_to_cache))
-    file_path = os.path.join(os.getcwd(), f"{number_of_saved_models - 1}.pt")
-    return torch.load(file_path)
+    # If there is a model avalible.
+    if number_of_saved_models != 0:
+        file_path = os.path.join(path_to_cache, f"{number_of_saved_models - 1}.pt")
+        return torch.load(file_path)
+    # Create a new model if no model is avalible.
+    else:
+        model = Model()
+        save_model(model)
+        return model
