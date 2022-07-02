@@ -1,4 +1,5 @@
-#!/usr/bin/env python3
+"""Defines the model used in monte carlo tree search."""
+# /usr/bin/env python3
 import torch
 from torch import nn
 import torch.nn.functional as F
@@ -6,43 +7,35 @@ from torch import Tensor
 
 import os
 
-from engine.misc.config import config
+from engine.misc.config import cfg
 
-model_config = config["model"]
-size = config["game"]["size"]
 
 # NOTE: Run on cuda if avalible
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-path_to_cache = os.path.join(os.getcwd(), config["model"]["path_to_model_cache"])
+path_to_cache = os.path.join(os.getcwd(), cfg.model.path_to_model_cache)
 
 
 class ResidualBlock(nn.Module):
     """The building blocks of the residual neural network."""
 
     def __init__(self):
-        """Initializes a residual block."""
+        """Initialize a residual block."""
         super(ResidualBlock, self).__init__()
         # Initialize convolutional layers
         self.conv1 = nn.Conv2d(
-            model_config["number_of_filters"],
-            model_config["number_of_filters"],
-            3,
-            padding=1,
+            cfg.model.number_of_filters, cfg.model.number_of_filters, 3, padding=1,
         )
         self.conv2 = nn.Conv2d(
-            model_config["number_of_filters"],
-            model_config["number_of_filters"],
-            3,
-            padding=1,
+            cfg.model.number_of_filters, cfg.model.number_of_filters, 3, padding=1,
         )
 
-        self.dropout1 = nn.Dropout(p=model_config["dropout_rate"])
-        self.dropout2 = nn.Dropout(p=model_config["dropout_rate"])
+        self.dropout1 = nn.Dropout(p=cfg.model.dropout_rate)
+        self.dropout2 = nn.Dropout(p=cfg.model.dropout_rate)
         #
         # Performs batch norm
-        self.batch_norm1 = nn.BatchNorm2d(model_config["number_of_filters"])
-        self.batch_norm2 = nn.BatchNorm2d(model_config["number_of_filters"])
+        self.batch_norm1 = nn.BatchNorm2d(cfg.model.number_of_filters)
+        self.batch_norm2 = nn.BatchNorm2d(cfg.model.number_of_filters)
 
     def forward(self, x: Tensor, training: bool = False) -> Tensor:
         """Pass the tensor x through the residual block."""
@@ -61,37 +54,35 @@ class ValueHead(nn.Module):
     """The value head of the model."""
 
     def __init__(self):
-        """Initializes the value head of the network."""
+        """Initialize the value head of the network."""
         super(ValueHead, self).__init__()
         # Convolutional filters
         self.conv = nn.Conv2d(
-            model_config["number_of_filters"], model_config["value_head_filters"], 1
+            cfg.model.number_of_filters, cfg.model.value_head_filters, 1
         )
-        self.batch_norm = nn.BatchNorm2d(model_config["value_head_filters"])
+        self.batch_norm = nn.BatchNorm2d(cfg.model.value_head_filters)
 
         # Dropout layers
         self.dropout_layers = nn.ModuleList(
             [
-                nn.Dropout(p=model_config["dropout_rate"])
-                for _ in range(model_config["number_of_hidden_layers"])
+                nn.Dropout(p=cfg.model.dropout_rate)
+                for _ in range(cfg.model.number_of_hidden_layers)
             ]
         )
 
         # Hidden layers
         hidden_layers = [
             nn.Linear(
-                model_config["value_head_filters"] * size * size,
-                model_config["number_of_neurons"],
+                cfg.model.value_head_filters * cfg.game.size * cfg.game.size,
+                cfg.model.number_of_neurons,
             )
         ]
-        for _ in range(model_config["number_of_hidden_layers"] - 2):
+        for _ in range(cfg.model.number_of_hidden_layers - 2):
             hidden_layers.append(
-                nn.Linear(
-                    model_config["number_of_neurons"], model_config["number_of_neurons"]
-                )
+                nn.Linear(cfg.model.number_of_neurons, cfg.model.number_of_neurons)
             )
 
-        hidden_layers.append(nn.Linear(model_config["number_of_neurons"], 1))
+        hidden_layers.append(nn.Linear(cfg.model.number_of_neurons, 1))
 
         self.hidden_layers = nn.ModuleList(hidden_layers)
 
@@ -120,35 +111,33 @@ class PolicyHead(nn.Module):
         super(PolicyHead, self).__init__()
         # Convolutional filters
         self.conv = nn.Conv2d(
-            model_config["number_of_filters"], model_config["policy_head_filters"], 1
+            cfg.model.number_of_filters, cfg.model.policy_head_filters, 1
         )
-        self.batch_norm = nn.BatchNorm2d(model_config["policy_head_filters"])
+        self.batch_norm = nn.BatchNorm2d(cfg.model.policy_head_filters)
 
         # Dropout layers
         self.dropout_layers = nn.ModuleList(
             [
-                nn.Dropout(p=model_config["dropout_rate"])
-                for _ in range(model_config["number_of_hidden_layers"])
+                nn.Dropout(p=cfg.model.dropout_rate)
+                for _ in range(cfg.model.number_of_hidden_layers)
             ]
         )
 
         # Hidden layers
         hidden_layers = [
             nn.Linear(
-                model_config["policy_head_filters"] * size * size,
-                model_config["number_of_neurons"],
+                cfg.model.policy_head_filters * cfg.game.size * cfg.game.size,
+                cfg.model.number_of_neurons,
             )
         ]
-        for _ in range(model_config["number_of_hidden_layers"] - 2):
+        for _ in range(cfg.model.number_of_hidden_layers - 2):
             hidden_layers.append(
-                nn.Linear(
-                    model_config["number_of_neurons"], model_config["number_of_neurons"]
-                )
+                nn.Linear(cfg.model.number_of_neurons, cfg.model.number_of_neurons)
             )
 
         # NOTE: We also have an output for passing.
         hidden_layers.append(
-            nn.Linear(model_config["number_of_neurons"], size * size + 1)
+            nn.Linear(cfg.model.number_of_neurons, cfg.game.size * cfg.game.size + 1)
         )
 
         self.hidden_layers = nn.ModuleList(hidden_layers)
@@ -184,16 +173,16 @@ class Model(nn.Module):
         # so a totoal of 5 + move_given_to_model
         # Shared layers
         self.conv = nn.Conv2d(
-            5 + config["game"]["moves_given_to_model"],
-            model_config["number_of_filters"],
+            5 + cfg.game.moves_given_to_model,
+            cfg.model.number_of_filters,
             3,
             padding=1,
         )
-        self.batch_norm = nn.BatchNorm2d(model_config["number_of_filters"])
-        self.dropout = nn.Dropout(model_config["dropout_rate"])
+        self.batch_norm = nn.BatchNorm2d(cfg.model.number_of_filters)
+        self.dropout = nn.Dropout(cfg.model.dropout_rate)
 
         self.residual_blocks = nn.ModuleList(
-            [ResidualBlock() for i in range(model_config["number_of_residual_blocks"])]
+            [ResidualBlock() for i in range(cfg.model.number_of_residual_blocks)]
         )
 
         # Policy & value head

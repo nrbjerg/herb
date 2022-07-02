@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 from engine.misc.types import Matrix, Datapoint
-from engine.misc.config import config
+from engine.misc.config import cfg
 
 import numpy as np
 from numpy.typing import ArrayLike
 from typing import List
 
-size = config["game"]["size"]
+size = cfg.game.size
 
 
 def _add_pass_to_policy(policy_matrix: Matrix, pass_policy: float) -> Matrix:
@@ -61,4 +61,4 @@ def extract_symertries(
 
     normal = [Datapoint(inputs, policy, value)]
 
-    return normal
+    return reflections + rotations + normal

@@ -1,21 +1,4 @@
 #!/usr/bin/env python3
-import yaml
-from typing import Dict, Any
-import os
-
-
-def load_config():
-    """Load the entiere config from the current working directory."""
-    path = os.path.join(os.getcwd(), "conf.yaml")
-    with open(path, "r") as file:
-        conf = yaml.load(file, Loader=yaml.FullLoader)
-
-    return conf
-
-
-config = load_config()
-
-#!/usr/bin/env python3
 from typing import Dict, Any
 
 
@@ -37,6 +20,7 @@ class ModelConfig:
         self.policy_head_filters = 16
 
         # General hyper params
+        self.perform_batch_norm = True
         self.dropout_rate = 0.3
 
         self.path_to_model_cache = "models/"
@@ -47,7 +31,7 @@ class GameConfig:
 
     def __init__(self):
         """Load the game config from the conf.yaml file."""
-        self.size = 9  # NOTE: Testing only works when this is set to 9
+        self.size = 5  # NOTE: Testing only works when this is set to 9
         self.komi = 4.5
         self.maximum_number_of_moves = 180
         self.moves_given_to_model = 5
@@ -95,11 +79,8 @@ class Config:
 
     def __init__(self):
         """Load each config."""
-        self.game = GameConfig()
-        self.data = DataConfig()
-        self.training = TrainingConfig()
-        self.testing = TestingConfig()
-        self.model = ModelConfig()
-
-
-cfg = Config()
+        self.game_cfg = GameConfig()
+        self.data_cfg = DataConfig()
+        self.training_cfg = TrainingConfig()
+        self.testing_cfg = TestingConfig()
+        self.model_cfg = ModelConfig()

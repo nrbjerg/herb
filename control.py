@@ -1,25 +1,25 @@
 """Script for controling the project."""
 # /usr/bin/env python3
 import os
-from engine.misc.config import config
+from engine.misc.config import cfg
 from engine.training import self_play, train
 from engine.model import load_latest_model, path_to_cache, save_model
 from engine.data import load_dataset
-from engine.test import compute_model_winrate_against
+from engine.test_model import compute_model_winrate_against
 import argparse
 import shutil
 
 
 def remove_data(*arg, **kwarg):
     """Remove the contents of the models directory."""
-    path = os.path.join(os.getcwd(), config["data"]["path_to_database"])
+    path = os.path.join(os.getcwd(), cfg.data.path_to_database)
     shutil.rmtree(path, ignore_errors=True)
     os.mkdir(path)
 
 
 def remove_models(*arg, **kwarg):
     """Remove the contents of the models directory."""
-    path = os.path.join(os.getcwd(), config["model"]["path_to_model_cache"])
+    path = os.path.join(os.getcwd(), cfg.model.path_to_model_cache)
     shutil.rmtree(path, ignore_errors=True)
     os.mkdir(path)
 
@@ -35,7 +35,7 @@ def train_models(generations: int):
         print(
             f"Generation: currently {gen} / {generations}, and there has in total been {len(os.listdir(path_to_cache)) - 1} improved models."
         )
-        self_play(model, config["game"]["size"], config["game"]["komi"])
+        self_play(model, cfg.game.size, cfg.game.komi)
         # TODO: Implement a window function for this.
         new_model = train(load_dataset(generations=2), model)
 

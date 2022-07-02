@@ -4,22 +4,21 @@ from engine.model import Model
 from engine.state import State
 from engine.misc.types import Matrix, Move, Hash, Pass
 from typing import Tuple
-from engine.misc.config import config
+from engine.misc.config import cfg
 import numpy as np
 import torch
 from copy import deepcopy
 
 
-size = config["game"]["size"]
 c_puct = 1.1
 
 
 def convert_index_to_move(index: int) -> Move:
     """Convert the output from the model to an actual point."""
-    if index == size ** 2:
+    if index == cfg.game.size ** 2:
         return Pass
     else:
-        return (index // size, index % size)
+        return (index // cfg.game.size, index % cfg.game.size)
 
 
 def add_noise(policy: Matrix):
@@ -28,17 +27,16 @@ def add_noise(policy: Matrix):
 
 
 class MCTS:
-    """A parallel montecarlo tree search algorithm."""
+    """A monte carlo tree search algorithm."""
 
     def __init__(self, model: Model):
         """Intialize the MCTS tree."""
-        self.size = config["game"]["size"]
+        self.size = cfg.game.size
         self.maximum_depth = 64
         self.model = model
         # Cache model predictions for speed & efficiency.
         self.predictions = {}
 
-        # NOTE: THE FUCK IS A Q VALUE?
         self.Qsa = {}  # The Q values for s,a
         self.Nsa = {}  # The number of times the action a has been taken from state s
         self.Ns = {}  # The number of times the state has been visited
@@ -69,10 +67,10 @@ class MCTS:
         ).flatten()
         # TEST: Its very weird that the highest number seems to move, with the times
         # this function is called, could be a quincidence or maybe its the neural network
-
-        if temperature == 0.0:
+        total = np.sum(counts)
+        if temperature == 0.0 or total == 0.0:
             # Play deterministicly
-            probs = np.zeros((1, size * size + 1), dtype="float32")
+            probs = np.zeros((1, self.size * self.size + 1), dtype="float32")
             probs[0][np.argmax(counts)] = 1.0
             return probs
 
@@ -143,7 +141,7 @@ class MCTS:
     def search(self, state: State, depth: int = 0):
         """Search through the posibilities."""
         if depth == self.maximum_depth:
-            return 0
+            return 0  # TODO: Shouldn't this be the model evaluated at the state?
 
         state = deepcopy(state)  # NOTE: Don't mutate the original state.
         key = state.__hash__()

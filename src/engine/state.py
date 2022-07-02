@@ -6,7 +6,7 @@ from numpy.typing import ArrayLike
 from itertools import product
 import random
 from engine.misc.types import Point, Board, Matrix, Player, Move
-from engine.misc.config import config
+from engine.misc.config import cfg
 import numba as nb
 
 
@@ -262,10 +262,10 @@ class State:
 
     def get_move_tensor(self) -> Matrix:
         """Create a 3d tensor, to mask the latest moves."""
-        mask = np.zeros((config["game"]["moves_given_to_model"], self.size, self.size))
+        mask = np.zeros((cfg.game.moves_given_to_model, self.size, self.size))
 
         for idx, move in enumerate(
-            reversed(self.moves[-config["game"]["moves_given_to_model"] :])
+            reversed(self.moves[-cfg.game.moves_given_to_model :])
         ):
             mask[idx][move] = 1
 
@@ -273,10 +273,7 @@ class State:
 
     # TODO: there must be a faster way to do this, maybe keep track of the groups seperatly?
     def get_liberties_matrix(self) -> Matrix:
-        """
-           Create a tensor with entery i,j corresponding the number of liberties that
-           the group containing the stone at i,j has, 0 if i,j is an empty point.
-        """
+        """ Create a tensor with entery i,j corresponding the number of liberties that the group containing the stone at i,j has, 0 if i,j is an empty point."""
         mask = np.zeros((self.size, self.size))
         points = set()
         for point in self.points:

@@ -4,7 +4,7 @@ from typing import Tuple, List, Dict, Any, Union
 from numpy.typing import ArrayLike
 from enum import IntEnum
 from dataclasses import dataclass
-from engine.misc.config import config
+from engine.misc.config import cfg
 
 Point = Tuple[int, int]
 Pass = None
@@ -71,7 +71,7 @@ class Game:
         dictionary = {
             "pre_moves": [tuple(int(c) for c in move) for move in self.pre_moves],
             "moves": [
-                (config["game"]["size"], config["game"]["size"])
+                (cfg.game.size, cfg.game.size)
                 if move is Pass
                 else tuple(int(c) for c in move)
                 for move in self.moves

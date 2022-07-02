@@ -1,9 +1,8 @@
 """This script contains functions to turn a list of moves into usable data for training."""
 # /usr/bin/env python3
 import numpy as np
-from typing import List, Tuple
+from typing import List
 from engine.misc.types import (
-    Board,
     Matrix,
     Dataset,
     Datapoint,
@@ -15,11 +14,11 @@ from engine.misc.types import (
 )
 from engine.state import State
 from engine.symmertrices import extract_symertries
-from engine.misc.config import config
+from engine.misc.config import cfg
 import json
 import os
 
-base_path_to_data = os.path.join(os.getcwd(), config["data"]["path_to_database"])
+base_path_to_data = os.path.join(os.getcwd(), cfg.data.path_to_database)
 
 
 def get_datapoints(
@@ -32,7 +31,7 @@ def get_datapoints(
     datapoints = []
 
     # Intialize state
-    state = State(config["game"]["size"], config["game"]["komi"])
+    state = State(cfg.game.size, cfg.game.komi)
     for move in pre_moves:
         state.play_move(move)
 
@@ -57,7 +56,7 @@ def get_datapoints(
 
 def load_data_from_file(path_to_file: str) -> List[Datapoint]:
     """Load the data from the file, and convert it to individual datapoints."""
-    size = config["game"]["size"]
+    size = cfg.game.size
     with open(path_to_file, "r") as file:
         json_object = json.load(file)
         pre_moves = map(lambda m: tuple(m), json_object["pre_moves"])

@@ -5,8 +5,7 @@ from .conf_test import (
     load_ko_and_surcide_state,
     load_string_capture_state,
 )
-from tui.repressent_board import get_string_representation
-from engine.misc.config import config
+from engine.misc.config import cfg
 import numpy as np
 
 
@@ -103,13 +102,7 @@ def test_captures():
     assert state.board[1][8][7] == 0
 
     print("testing move tensor")
-    mask = np.zeros(
-        (
-            config["game"]["moves_given_to_model"],
-            config["game"]["size"],
-            config["game"]["size"],
-        )
-    )
+    mask = np.zeros((cfg.game.moves_given_to_model, cfg.game.size, cfg.game.size))
     mask[0, 7, 8] = 1
     mask[1, 3, 1] = 1
     assert np.array_equal(mask, state.get_move_tensor())
