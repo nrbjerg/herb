@@ -95,7 +95,6 @@ class ValueHead(nn.Module):
 
         # Pass through linear layers
         for dropout, hidden in zip(self.dropout_layers[1:], self.hidden_layers[:-1]):
-            # TODO: Do batch norm here
             x = F.relu(hidden(x))
             if training:
                 x = dropout(x)

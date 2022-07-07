@@ -21,6 +21,12 @@ import os
 base_path_to_data = os.path.join(os.getcwd(), cfg.data.path_to_database)
 
 
+# NOTE: didn't use pytorch because of the converting back and forth
+def tanh(x: float) -> float:
+    """Compute hyperbolic tangent of x."""
+    return (np.exp(x) - np.exp(-x)) / (np.exp(x) + np.exp(-x))
+
+
 def get_datapoints(
     pre_moves: List[Point],
     moves: List[Point],
@@ -36,12 +42,11 @@ def get_datapoints(
         state.play_move(move)
 
     for policy, move in zip(policies, moves):
-        # Is this how good the current state is for the player or other whise
-        # (i think its how good it is for the opponent)
-        value = (
-            outcome.point_difference
-            if outcome.winner == state.current_opponent
-            else -outcome.point_difference
+        # The model needs to predict how good the current state is for the current player.
+        value = tanh(
+            -outcome.point_difference
+            if outcome.winner == state.current_player
+            else outcome.point_difference
         )
         # Get model inputs
         inputs = state.convert_to_input_tensor()
@@ -56,13 +61,12 @@ def get_datapoints(
 
 def load_data_from_file(path_to_file: str) -> List[Datapoint]:
     """Load the data from the file, and convert it to individual datapoints."""
-    size = cfg.game.size
     with open(path_to_file, "r") as file:
         json_object = json.load(file)
         pre_moves = map(lambda m: tuple(m), json_object["pre_moves"])
         # NOTE: move is represented as a tuple, but serialized as a list.
         moves = [
-            tuple(move) if move != [size, size] else Pass
+            tuple(move) if move != [cfg.game.size, cfg.game.size] else Pass
             for move in json_object["moves"]
         ]
         policies = [np.array(pol) for pol in json_object["policies"]]

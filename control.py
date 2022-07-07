@@ -33,11 +33,12 @@ def train_models(generations: int):
     # Perform self play
     for gen in range(starting_generaiton, starting_generaiton + generations):
         print(
-            f"Generation: currently {gen} / {generations}, and there has in total been {len(os.listdir(path_to_cache)) - 1} improved models."
+            f"Generation: currently {gen} / {generations} ({len(os.listdir(path_to_cache)) - 1} improved models)"
         )
         self_play(model, cfg.game.size, cfg.game.komi)
         # TODO: Implement a window function for this.
-        new_model = train(load_dataset(generations=2), model)
+
+        new_model = train(load_dataset(generations=cfg.training.window), model)
 
         # Test new_model vs old model.
         if compute_model_winrate_against(new_model, model) > 0.5:

@@ -22,11 +22,6 @@ def cross_entropy(predictions: Tensor, targets: Tensor) -> float:
     return torch.mean(-torch.sum(targets * torch.log_softmax(predictions, dim=1), 1))
 
 
-def loss_function(p, v, p_target, v_target):
-    """Compute the loss, given the model outputs & the target outputs."""
-    return mse(v, v_target) + cross_entropy(p, p_target)
-
-
 def train(dataset: Dataset, model: Model) -> Model:
     """Train the model on the dataset."""
     print("Updating model parameters.")
@@ -40,52 +35,57 @@ def train(dataset: Dataset, model: Model) -> Model:
     optimizer = SGD(model.parameters(), lr=cfg.training.lr,)
     with trange(cfg.training.epochs, unit="epoch") as t:
         for epoch in t:
-
             permutation = torch.randperm(number_of_datapoints)
 
-            total_loss = 0
+            total_p_loss, total_v_loss = 0, 0
             for idx in range(0, number_of_datapoints, cfg.training.batch_size):
                 optimizer.zero_grad()
+
+                # Pass batch thorugh model
                 indicies = permutation[idx : idx + cfg.training.batch_size]
+                p, v = model(inputs[indicies], training=True)
 
                 # Compute the loss
-                p, v = model(inputs[indicies], training=True)
-                loss = loss_function(
-                    p,
-                    v,
-                    target_policies[indicies],
-                    torch.unsqueeze(target_values[indicies], 1),
-                )
+                p_loss = cross_entropy(p, target_policies[indicies])
+                v_loss = mse(v, torch.unsqueeze(target_values[indicies], 1))
+                loss = v_loss + p_loss
+
+                # Optimize model
                 loss.backward()
                 optimizer.step()
 
-                total_loss += loss.item()
+                total_p_loss += p_loss.item()
+                total_v_loss += v_loss.item()
 
             # Update progress bar
             t.set_postfix(
-                loss=total_loss / (number_of_datapoints / cfg.training.batch_size)
+                p=total_p_loss / (number_of_datapoints / cfg.training.batch_size),
+                v=total_v_loss / (number_of_datapoints / cfg.training.batch_size),
             )
 
     return model
 
 
-def self_play(model: Model, size: int, komi: float, pre_game_moves: int = 2):
+def self_play(model: Model, size: int, komi: float):
     """Use self play to get a new dataset, which will be saved, in the data directory."""
     mcts = MCTS(model)
-    policies = []
     games = []
 
     # TODO: Implement a roolouts window (ie. pick a random number in a specified range.)
     print("Generating training data.")
     for game in trange(cfg.training.number_of_games, unit="game"):
+        policies = []
         # Setup initial state
         state = State(size, komi)
-        initial_moves = get_initial_moves(size, pre_game_moves)
+        initial_moves = get_initial_moves(size, cfg.training.predetermined_moves)
         for move in initial_moves:
             state.play_move(move)
 
         # Play moves until the game is over
-        number_of_moves_played = 0
+        number_of_moves_played = cfg.training.predetermined_moves
+        moves_played_before_deterministic_play = (
+            cfg.training.moves_before_deterministic_play()
+        )
         while (
             state.has_terminated() is False
             and number_of_moves_played <= cfg.testing.maximum_number_of_moves
@@ -93,7 +93,7 @@ def self_play(model: Model, size: int, komi: float, pre_game_moves: int = 2):
             # Get move, ether deterministic or random based on the number of moves played
             policy = mcts.get_move_probabilities(state, cfg.training.roolouts)
 
-            if number_of_moves_played < cfg.training.moves_before_deterministic_play:
+            if number_of_moves_played < moves_played_before_deterministic_play:
                 move = convert_index_to_move(
                     np.random.choice(policy.shape[-1], p=policy.flatten())
                 )
@@ -104,14 +104,15 @@ def self_play(model: Model, size: int, komi: float, pre_game_moves: int = 2):
             state.play_move(move)
             number_of_moves_played += 1
 
-        # Generate game object.
+        # Generate game object. NOTE: Komi makes sure that it's never a tie.
         difference = state.score_relative_to(state.current_player)
         winner = state.current_player if difference > 0 else state.current_opponent
         outcome = GameOutcome(abs(difference), winner)
+
         games.append(
             Game(
                 initial_moves,
-                state.moves[cfg.training.moves_before_deterministic_play :],
+                state.moves[cfg.training.predetermined_moves :],
                 outcome,
                 policies,
             )

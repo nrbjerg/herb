@@ -15,7 +15,7 @@ Basics
  - [x] Testing of basics.
 
 AI 
- - [ ] Monte Carlo Tree Search.
+ - [x] Monte Carlo Tree Search.
  - [x] Res net.
  - [ ] Training visualizations 
 

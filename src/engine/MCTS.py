@@ -1,16 +1,14 @@
 """Source code for implementing monte carlo tree search."""
 # /usr/bin/env python3
+from __future__ import annotations
 from engine.model import Model
 from engine.state import State
-from engine.misc.types import Matrix, Move, Hash, Pass
-from typing import Tuple
+from engine.misc.types import Matrix, Move, Pass
+from typing import Tuple, Dict, List
 from engine.misc.config import cfg
 import numpy as np
 import torch
 from copy import deepcopy
-
-
-c_puct = 1.1
 
 
 def convert_index_to_move(index: int) -> Move:
@@ -21,109 +19,173 @@ def convert_index_to_move(index: int) -> Move:
         return (index // cfg.game.size, index % cfg.game.size)
 
 
-def add_noise(policy: Matrix):
-    """Add noise to the policy matrix."""
-    pass
+class Node:
+    """Models a node in the monte carlo tree."""
+
+    def __init__(self, state: State, parent: Node, prior: float = 0.0):
+        """Initialize the node."""
+        self.state = state
+        self.parent = parent
+        self.prior = prior
+        self.children = {}
+        self.total_value = 0
+        self.visits = 0
+        self.is_expanded = False
+
+    @property
+    def Q(self) -> float:
+        """Compute the average value."""
+        return self.total_value / (1 + self.visits)
+
+    @property
+    def U(self) -> float:
+        """Compute the upper confidence score."""
+        return np.sqrt(self.parent.visits) * self.prior / (1 + self.visits)
+
+    @property
+    def child_scores(self) -> List:
+        """Return a matrix of the child scores."""
+        scores = np.zeros((cfg.game.size ** 2 + 1))
+        for move, child in self.children.items():
+            scores[move] = child.Q + cfg.mcts.c_puct * child.U
+
+        return scores
+
+    @property
+    def child_visits(self) -> Matrix:
+        """Return a matrix of the child scores."""
+        scores = np.zeros((1, cfg.game.size ** 2 + 1))
+        for move, child in self.children.items():
+            scores[0][move] = child.visits
+
+        return scores
+
+    def best_move_and_child(self) -> Node:
+        """Pick the best move and child."""
+        # This sequence can be empty? NOTE: Where is it called, and does expanded mean that there is atleast a child?
+        return max(
+            self.children.items(),
+            key=lambda move_and_child: move_and_child[1].Q
+            + cfg.mcts.c_puct * move_and_child[1].U,
+        )
+
+    def best_child(self) -> Node:
+        """Pick the best child."""
+        return self.best_move_and_child()[1]
+
+    @property
+    def best_move(self) -> Move:
+        """Pick the best move."""
+        return self.best_move_and_child()[0]
+
+    def select_leaf(self) -> Node:
+        """Select the best child, until a leaf is picked."""
+        current = self
+        while current.is_expanded:
+            current = current.best_child()
+        return current
+
+    def expand_node(self, child_priors: Matrix):  # TODO: Add dirichlet noise.
+        """Add the children of the node."""
+        self.is_expanded = True
+        legal_moves = self.state.get_avalible_moves(self.state.current_player)
+        child_priors[:-1] = child_priors[-1] * legal_moves.reshape(cfg.game.size ** 2)
+        for move, prior in enumerate(child_priors):
+            if prior > 0:
+                state = deepcopy(self.state)
+                state.play_move(convert_index_to_move(move))
+
+                # Back propagatethe outcome of the game if the game has been termintated
+                if state.has_terminated():
+                    score = state.score_relative_to(state.current_player)
+                    value = 1 if score < 0 else -1
+                    self.back_prop_value(value)
+
+                # Otherwise add the child.
+                else:
+                    self.children[move] = Node(state, parent=self, prior=prior)
+
+        # If there are no children, set is expanded to false.
+        if len(self.children) == 0:
+            self.is_expanded = False
+
+    def back_prop_value(self, value: float):
+        """Back propagates the value back up through the tree."""
+        self.visits += 1
+        self.total_value += value
+        if self.parent is not None:  # Back propagate until the root is reached.
+            self.parent.back_prop_value(-value)
 
 
 class MCTS:
-    """A monte carlo tree search algorithm."""
+    """The monte carlo tree search algorithm."""
 
     def __init__(self, model: Model):
-        """Intialize the MCTS tree."""
-        self.size = cfg.game.size
-        self.maximum_depth = 64
+        """Intialize the algorithm."""
         self.model = model
-        # Cache model predictions for speed & efficiency.
-        self.predictions = {}
-
-        self.Qsa = {}  # The Q values for s,a
-        self.Nsa = {}  # The number of times the action a has been taken from state s
-        self.Ns = {}  # The number of times the state has been visited
-
-        self.Ps = {}  # Stores the initial policy (from the neural network)
-
-        # Stores if the current state has terminated (1 for win, -1 for not terminated)
-        self.Es = {}
-        self.Vs = {}  # Stores the valid moves for the state s
+        self.size = cfg.game.size
+        self.evaluated_states: Dict[State, Node] = {}  # state: node
+        self.predictions: Dict[State, Tuple[float, Matrix]] = {}
 
     def get_move_probabilities(
         self, state: State, roolouts: int, temperature: float = 1.0
     ) -> Matrix:
         """Compute the action probabilities."""
-        # Populate dictionaries
-        for _ in range(roolouts):
-            self.search(state)
+        root = self.search(state, roolouts)
+        visits = root.child_visits
+        total = sum(sum(visits))
 
-        key = state.__hash__()
-
-        counts = np.array(
-            [[self.Nsa.get((key, move), 0) for move in range(self.size ** 2 + 1)]],
-            dtype="float32",
-        )
-
-        counts[0][: self.size ** 2] *= state.get_avalible_moves(
-            state.current_player
-        ).flatten()
-        # TEST: Its very weird that the highest number seems to move, with the times
-        # this function is called, could be a quincidence or maybe its the neural network
-        total = np.sum(counts)
         if temperature == 0.0 or total == 0.0:
-            # Play deterministicly
-            probs = np.zeros((1, self.size * self.size + 1), dtype="float32")
-            probs[0][np.argmax(counts)] = 1.0
+            # Play deterministicly:
+            probs = np.zeros((1, cfg.game.size ** 2 + 1), dtype="float32")
+            probs[0][np.argmax(visits)] = 1.0
             return probs
 
         else:
-            return counts / np.sum(counts)
+            # Scale the visists acording to the temperature.
+            pi = np.power(visits, 1 / temperature)
+            probs = pi / sum(sum(pi))
+            return probs
 
     def get_best_move(self, state: State, roolouts: int) -> Move:
         """Get the best move for testing purposes."""
-        move_index = np.argmax(
-            self.get_move_probabilities(state, roolouts, temperature=0.0)
-        )
-        return convert_index_to_move(move_index)
+        root = self.search(state, roolouts)
+        return root.best_move
+
+    def search(self, state: State, roolouts: int) -> Node:
+        """Perform the actual search. expanding the tree ect. and returns the root of the search."""
+        # Load the state if posible.
+        if state in self.evaluated_states.keys():
+            root = self.evaluated_states[state]
+            root.parent = None
+        else:
+            root = Node(state, None)
+            self.evaluated_states[state] = root
+
+        for _ in range(roolouts):
+            leaf = root.select_leaf()
+
+            # Perform predictions and backprop
+            p, v = self.predict_with_model(state)
+            leaf.back_prop_value(v)
+            leaf.expand_node(p)
+
+            # Store for later.
+            self.evaluated_states[leaf.state.__hash__()] = leaf
+
+        return root
 
     def get_training_move(self, state: State, roolouts: int) -> Move:
         """Get a move for trainig purposes."""
-        probs = self.get_move_probabilities(state, roolouts).flatten()
-        return convert_index_to_move(np.random.choice(len(probs), p=probs))
-
-    def compute_UCB_score(self, move: int, key: Hash, prior: float) -> float:
-        """Compute the usb score."""
-        if (
-            key,
-            move,
-        ) in self.Qsa:  # NOTE: if its in the Qsa dict, then its also in the Nsa dict.
-            return self.Qsa[(key, move)] + c_puct * prior * np.sqrt(self.Ns[key]) / (
-                1 + self.Nsa[(key, move)]
+        return convert_index_to_move(
+            np.random.choice(
+                cfg.game.szie ** 2 + 1, p=self.get_move_probabilities(state, roolouts)
             )
-        else:
-            return (
-                c_puct * prior * np.sqrt(self.Ns[key] + 1e-8)
-            )  # the 1e-8 makes sure that its never 0
+        )
 
-    def pick_move_index_with_highest_UCB_score(self, key: Hash) -> int:
-        """Return the index of the move with the highest UCB score."""
-        # NOTE: That the pass encoded as (size * size) is always valid
-        scores = [
-            self.compute_UCB_score(move, key, self.Ps[key][move])
-            if self.Vs[key][move] == 1
-            else 0
-            for move in range(self.size ** 2 + 1)
-        ]
-
-        move_index = np.argmax(scores)
-
-        return move_index
-
-    def pick_move_with_highest_UCB_score(self, key: Hash) -> Move:
-        """Pick the move with the highest UCB score."""
-        return convert_index_to_move(self.pick_move_index_with_highest_UCB_score(key))
-
-    def predict_with_model(self, state: State, key: Hash) -> Tuple[Matrix, float]:
+    def predict_with_model(self, state: State) -> Tuple[Matrix, float]:
         """Perform predictions with the moved, if needed."""
-        if key not in self.predictions:
+        if state not in self.predictions:
             policy, value = self.model(
                 torch.from_numpy(
                     np.expand_dims(state.convert_to_input_tensor(), axis=0)
@@ -131,83 +193,9 @@ class MCTS:
             )
 
             # NOTE: The indicies is because the model returns 3d tensors.
-            self.predictions[key] = (
+            self.predictions[state] = (
                 policy[0].detach().numpy(),
                 value[0][0].detach().numpy(),
             )
 
-        return self.predictions[key]
-
-    def search(self, state: State, depth: int = 0):
-        """Search through the posibilities."""
-        if depth == self.maximum_depth:
-            return 0  # TODO: Shouldn't this be the model evaluated at the state?
-
-        state = deepcopy(state)  # NOTE: Don't mutate the original state.
-        key = state.__hash__()
-
-        # Check if the state has been terminated
-        if key not in self.Es:
-            self.Es[key] = state.has_terminated()
-
-        # If the state has been terminated, return the score of who won
-        if self.Es[key] is True:
-            return state.score_relative_to(
-                state.current_opponent
-            )  # The result, based uppon the last player
-
-        if key not in self.Ps:  # We have hit a leaf node
-            self.Ps[key], v = self.predict_with_model(state, key)
-
-            # Add the pass to this.
-            valid_moves = np.ones((self.size ** 2 + 1,))
-            valid_moves[: self.size ** 2] = np.reshape(
-                state.get_avalible_moves(state.current_player), (self.size ** 2),
-            )
-
-            self.Ps[key] *= valid_moves
-
-            # Normalize the policy
-            k = np.sum(self.Ps[key])
-            if k > 0:
-                self.Ps[key] = self.Ps[key] / k
-
-            else:
-                print("Warning: all moves where masked.")
-                self.Ps[key] = valid_moves / np.sum(valid_moves)
-
-            # This is not a problem since this is a leaf node then.
-            self.Vs[key] = valid_moves
-            self.Ns[key] = 0
-
-            # This should be from the view of there current player, therefore -v is backprobagated.
-            return -v
-
-        move_index = self.pick_move_index_with_highest_UCB_score(key)
-        new_state = deepcopy(state)
-        new_state.play_move(convert_index_to_move(move_index))
-        v = self.search(
-            new_state, depth=depth + 1
-        )  # NOTE: Continue searching until we reach a leaf node
-
-        # Update information
-        if (key, move_index) in self.Qsa:
-            self.Qsa[(key, move_index)] = (
-                self.Nsa[(key, move_index)] * self.Qsa[(key, move_index)] + v
-            ) / (self.Nsa[(key, move_index)] + 1)
-            self.Nsa[(key, move_index)] += 1
-
-        # Initialize information
-        else:
-            self.Qsa[(key, move_index)] = v
-            self.Nsa[(key, move_index)] = 1
-
-        self.Ns[key] += 1
-
-        return -v
-
-    def reset(self, hard_reset: bool = False):
-        """Reset the dictionaries, and if hard == True, also reset the predictions."""
-        self.Qsa, self.Nsa, self.Ns, self.Es, self.Ps, self.Vs = {}, {}, {}, {}, {}, {}
-        if hard_reset:
-            self.predictions = {}
+        return self.predictions[state]

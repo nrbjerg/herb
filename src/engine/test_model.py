@@ -24,7 +24,16 @@ def play_game(state: State, players: Tuple[MCTS], roolouts: int) -> GameOutcome:
                 state.current_player if difference > 0 else state.current_opponent,
             )
 
-    return None
+
+def setup_state() -> State:
+    """Intializes a random state."""
+    state = State(cfg.game.size, cfg.game.komi)
+    for move in get_initial_moves(
+        cfg.game.size, cfg.training.moves_before_deterministic_play
+    ):
+        state.play_move(move)
+
+    return state
 
 
 def compute_model_winrate_against(model: Model, opponent: Model) -> float:
@@ -32,24 +41,24 @@ def compute_model_winrate_against(model: Model, opponent: Model) -> float:
     print("Testing model, against older model.")
     wins = 0
     player, opponent = MCTS(model), MCTS(opponent)
+    with trange(cfg.testing.number_of_games, unit="game") as t:
+        for game in t:
+            # Play initial moves
+            state = setup_state()
+            # Each player gets a to play each color
+            outcome = play_game(
+                deepcopy(state), [player, opponent], cfg.testing.roolouts
+            )
+            if outcome is not None and outcome.winner == Player.BLACK:
+                wins += 1
 
-    for game in trange(cfg.testing.number_of_games, unit="game"):
-        # Play initial moves
-        state = State(cfg.game.size, cfg.game.komi)
-        for move in get_initial_moves(
-            cfg.game.size, cfg.training.moves_before_deterministic_play
-        ):
-            state.play_move(move)
+            outcome = play_game(state, [opponent, player], cfg.testing.roolouts)
+            if outcome is not None and outcome.winner == Player.WHITE:
+                wins += 1
 
-        # Each player gets a to play each color
-        outcome = play_game(deepcopy(state), [player, opponent], cfg.testing.roolouts)
-        if outcome is not None and outcome.winner == Player.BLACK:
-            wins += 1
+            winrate = wins / (cfg.testing.number_of_games * 2)
 
-        outcome = play_game(state, [opponent, player], cfg.testing.roolouts)
-        if outcome is not None and outcome.winner == Player.WHITE:
-            wins += 1
+            t.set_postfix(wr=winrate)
 
-    winrate = wins / (cfg.testing.number_of_games * 2)
     print(f"New model winrate: {winrate}")
     return winrate
